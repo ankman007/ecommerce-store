@@ -1,4 +1,4 @@
-from a_shop.models import Cart
+from shop.models import Cart
 
 def check_product_for_cart(request):
     cart_product_ids = set()

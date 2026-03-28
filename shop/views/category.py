@@ -1,8 +1,8 @@
-from a_shop.models import Product, Category, Cart
+from shop.models import Product, Category, Cart
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
-from a_shop.utils import check_product_for_cart
+from shop.utils import check_product_for_cart
 
 def category(request, slug):
     selected_category = get_object_or_404(Category, slug=slug)

@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from a_shop.models import Order
+from shop.models import Order
 
 @login_required
 def order(request):

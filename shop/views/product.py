@@ -1,8 +1,8 @@
 from django.shortcuts import render, get_object_or_404
-from a_shop.models import Product, Category, Cart
+from shop.models import Product, Category, Cart
 from django.db.models import Q
 from loguru import logger
-from a_shop.utils import check_product_for_cart
+from shop.utils import check_product_for_cart
 
     
 def product_detail(request, id):

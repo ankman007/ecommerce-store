@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-from a_shop.models import Product, Cart, CartItem
+from shop.models import Product, Cart, CartItem
 from loguru import logger
 
 def cart(request):

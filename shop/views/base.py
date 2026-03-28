@@ -1,12 +1,12 @@
-from a_shop.models import Product, Category
+from shop.models import Product, Category
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.contrib import messages
 from django.db.models import Count
-from a_shop.forms import ContactForm
+from shop.forms import ContactForm
 from django.http import HttpResponse
-from a_shop.utils import check_product_for_cart
-from a_shop.tasks import send_contact_email
+from shop.utils import check_product_for_cart
+from shop.tasks import send_contact_email
 
 def home(request):
     products = Product.objects.all()

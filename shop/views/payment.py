@@ -5,8 +5,8 @@ import stripe
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.contrib import messages
-from a_shop.models import Order, OrderItem, Product, Cart
-from a_shop.tasks import create_order_task
+from shop.models import Order, OrderItem, Product, Cart
+from shop.tasks import create_order_task
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
