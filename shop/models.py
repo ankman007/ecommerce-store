@@ -9,6 +9,11 @@ import re
 from django.core.files.base import ContentFile
 import shortuuid
 
+
+def generate_product_id():
+    return shortuuid.ShortUUID().random(length=8)
+
+
 class Category(models.Model):
     name = models.CharField(unique=True, max_length=200)
     slug = models.SlugField(unique=True, blank=True)
@@ -27,7 +32,7 @@ class Product(models.Model):
         primary_key=True,
         max_length=22,
         unique=True,
-        default=shortuuid.ShortUUID().random(length=8),
+        default=generate_product_id,
         editable=False
     )
     name = models.CharField(max_length=200)

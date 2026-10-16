@@ -6,9 +6,9 @@ from users.views import profile_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('a_shop.urls')),
+    path('', include('shop.urls')),
     path('accounts/', include('allauth.urls')),
-    path('profile/', include('a_users.urls')),
+    path('profile/', include('users.urls')),
     path('@<username>/', profile_view, name="profile"),
 ]
 

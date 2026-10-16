@@ -17,4 +17,4 @@ This Django-based eCommerce platform delivers a dynamic, responsive shopping exp
 3. Open the .env file and update it with your credentials as needed
 4. Build docker image with `docker-compose build`
 5. Start container with `docker-compose up`
-6. Project should be live at localhost port 8000.
+6. Project should be live at http://localhost:8085 (Flower at http://localhost:5560). Change `WEB_PORT` / `FLOWER_PORT` in .env if those ports are taken.

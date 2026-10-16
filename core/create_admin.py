@@ -6,7 +6,7 @@ sys.path.append('/app')
 
 load_dotenv()
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "a_core.settings"))
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "core.settings"))
 
 import django
 django.setup()

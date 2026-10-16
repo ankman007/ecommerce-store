@@ -3,54 +3,65 @@ services:
     build: .
     command: >
       sh -c "
-        /wait-for-it.sh db:3306 --timeout=30 --strict -- &&
         python manage.py migrate --noinput &&
-        python a_core/create_admin.py &&
-        python manage.py collectstatic --noinput &&
-        gunicorn a_core.wsgi:application --bind 0.0.0.0:8000"
+        python core/create_admin.py &&
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3 --reload"
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8085}:8000"
     volumes:
       - .:/app
+      # Keep the static files collected at build time instead of the host's (empty) folder
+      - /app/staticfiles
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
   celery:
     build: .
-    command: celery -A a_core worker --loglevel=info --pool=solo
+    command: celery -A core worker --loglevel=info --pool=solo
     volumes:
       - .:/app
     env_file:
       - .env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   flower:
     build: .
-    command: celery -A a_core flower --port=5555
+    command: celery -A core flower --port=5555
     ports:
-      - "5555:5555"
+      - "${FLOWER_PORT:-5560}:5555"
     env_file:
       - .env
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   db:
-    image: mysql:8
+    image: mysql:8.4
     restart: always
     environment:
       MYSQL_DATABASE: ${DB_NAME}
@@ -58,15 +69,16 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       TZ: Asia/Kathmandu
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      # 127.0.0.1 forces TCP, so the check only passes once the real server
+      # (not the temporary init server) is accepting connections
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
 volumes:
   mysql_data:

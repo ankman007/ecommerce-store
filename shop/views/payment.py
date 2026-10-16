@@ -1,5 +1,6 @@
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.http import HttpResponseBadRequest
 import stripe
 from django.conf import settings
@@ -50,8 +51,8 @@ def create_checkout_session(request):
             payment_method_types=['card'],
             line_items=line_items,
             mode='payment',
-            success_url='http://localhost:8000/success/',
-            cancel_url='http://localhost:8000/cancel/',
+            success_url=request.build_absolute_uri(reverse('success')),
+            cancel_url=request.build_absolute_uri(reverse('cancel')),
         )
         return redirect(checkout_session.url)
 
