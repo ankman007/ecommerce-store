@@ -1,5 +1,13 @@
 from django.urls import path
-from users.views import *
+from users.views import (
+    profile_delete_view,
+    profile_edit_view,
+    profile_emailchange,
+    profile_emailverify,
+    profile_settings_view,
+    profile_usernamechange,
+    profile_view,
+)
 
 urlpatterns = [
     path('', profile_view, name="profile"),

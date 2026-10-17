@@ -2,11 +2,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(os.path.join(BASE_DIR, '.env'))
-
-from django.core.exceptions import ImproperlyConfigured
 
 
 def env_bool(name, default=False):

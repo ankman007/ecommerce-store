@@ -1,0 +1,12 @@
+# Store and check out text files with LF everywhere (including Windows), so shell
+# scripts and Docker builds behave the same on every machine.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
