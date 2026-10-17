@@ -22,6 +22,7 @@ class ProductImageInline(admin.TabularInline):
     extra = 1
     fields = ('images', 'alt_text')
 
+
 class ProductAdminForm(forms.ModelForm):
     class Meta:
         model = Product
@@ -29,6 +30,7 @@ class ProductAdminForm(forms.ModelForm):
         widgets = {
             'description': CKEditorWidget(),
         }
+
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -40,22 +42,26 @@ class ProductAdmin(admin.ModelAdmin):
     list_select_related = ('category',)
     inlines = [ProductImageInline]
 
+
 @admin.register(ProductImage)
 class ProductImageAdmin(admin.ModelAdmin):
     list_display = ('product', 'alt_text')
     search_fields = ('product__name',)
     list_select_related = ('product',)
 
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug')
     prepopulated_fields = {'slug': ('name',)}
+
 
 class CartItemInline(admin.TabularInline):
     model = CartItem
     extra = 0
     raw_id_fields = ('product',)
     readonly_fields = ('subtotal',)
+
 
 @admin.register(Cart)
 class CartAdmin(admin.ModelAdmin):
@@ -65,12 +71,14 @@ class CartAdmin(admin.ModelAdmin):
     list_select_related = ('user',)
     inlines = [CartItemInline]
 
+
 @admin.register(CartItem)
 class CartItemAdmin(admin.ModelAdmin):
     list_display = ('cart', 'product', 'quantity', 'subtotal')
     readonly_fields = ('subtotal',)
     search_fields = ('product__name',)
     list_select_related = ('cart__user', 'product')
+
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):

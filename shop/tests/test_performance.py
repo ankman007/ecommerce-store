@@ -1,4 +1,5 @@
 """Query-count guards for read paths. Bounds are independent of product count (no N+1)."""
+
 import os
 from decimal import Decimal
 
@@ -25,8 +26,11 @@ class ReadPathQueryCountTests(TestCase):
         cls.products = []
         for i in range(15):
             p = Product.objects.create(
-                name=f'Product {i}', description='desc', price=Decimal('9.99'),
-                stock=5, category=cls.categories[i % 3],
+                name=f'Product {i}',
+                description='desc',
+                price=Decimal('9.99'),
+                stock=5,
+                category=cls.categories[i % 3],
             )
             for j in range(2):
                 ProductImage.objects.create(
@@ -60,10 +64,7 @@ class ReadPathQueryCountTests(TestCase):
         self.assertMaxQueries(reverse('product-search') + '?q=Product', 5)
 
     def test_product_detail_limits_similar_products(self):
-        extra = [
-            Product.objects.create(name=f'Extra {i}', price=1, category=self.categories[0])
-            for i in range(10)
-        ]
+        extra = [Product.objects.create(name=f'Extra {i}', price=1, category=self.categories[0]) for i in range(10)]
         response = self.assertMaxQueries(reverse('product_detail', args=[extra[0].id]), 6)
         self.assertLessEqual(len(response.context['similar_products']), 8)
         self.assertNotIn(extra[0], list(response.context['similar_products']))

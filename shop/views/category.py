@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 from shop.utils import check_product_for_cart, product_grid_queryset
 
+
 def category(request, slug):
     selected_category = get_object_or_404(Category, slug=slug)
     products = product_grid_queryset(Product.objects.filter(category=selected_category))
@@ -14,7 +15,6 @@ def category(request, slug):
         'products': products,
         'categories': categories,
         'selected_category': selected_category.name,
-        'cart_product_ids': cart_product_ids,  
-
+        'cart_product_ids': cart_product_ids,
     }
     return render(request, 'a_shop/home.html', context)

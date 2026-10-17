@@ -9,8 +9,13 @@ from shop.tests.helpers import PASSWORD, make_user
 from users.models import Profile
 
 LOGIN_REQUIRED_URLS = [
-    'orders', 'profile-edit', 'profile-onboarding', 'profile-settings',
-    'profile-emailchange', 'profile-usernamechange', 'profile-emailverify',
+    'orders',
+    'profile-edit',
+    'profile-onboarding',
+    'profile-settings',
+    'profile-emailchange',
+    'profile-usernamechange',
+    'profile-emailverify',
     'profile-delete',
 ]
 
@@ -39,17 +44,25 @@ class LoginRequiredTests(TestCase):
 class AuthTests(TestCase):
     def test_login_with_email(self):
         make_user('alice')
-        resp = self.client.post(reverse('account_login'), {
-            'login': 'alice@example.com', 'password': PASSWORD,
-        })
+        resp = self.client.post(
+            reverse('account_login'),
+            {
+                'login': 'alice@example.com',
+                'password': PASSWORD,
+            },
+        )
         self.assertEqual(resp.status_code, 302)
         self.assertIn('_auth_user_id', self.client.session)
 
     def test_login_wrong_password(self):
         make_user('alice')
-        resp = self.client.post(reverse('account_login'), {
-            'login': 'alice@example.com', 'password': 'wrong',
-        })
+        resp = self.client.post(
+            reverse('account_login'),
+            {
+                'login': 'alice@example.com',
+                'password': 'wrong',
+            },
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn('_auth_user_id', self.client.session)
 

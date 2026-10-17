@@ -15,16 +15,24 @@ def _paid_orders_for(user):
 @login_required
 def order(request):
     orders = _paid_orders_for(request.user).order_by('-created_at')
-    return render(request, 'a_shop/order.html', {
-        'orders': orders,
-    })
+    return render(
+        request,
+        'a_shop/order.html',
+        {
+            'orders': orders,
+        },
+    )
 
 
 @login_required
 def order_detail(request, order_id):
     # Scoped to the current user, so other customers' order ids return 404
     order = get_object_or_404(_paid_orders_for(request.user), pk=order_id)
-    return render(request, 'a_shop/order_detail.html', {
-        'order': order,
-        'just_placed': request.GET.get('placed') == '1',
-    })
+    return render(
+        request,
+        'a_shop/order_detail.html',
+        {
+            'order': order,
+            'just_placed': request.GET.get('placed') == '1',
+        },
+    )

@@ -8,4 +8,5 @@ def merge_guest_cart_on_login(sender, request, user, **kwargs):
     if request is None or not hasattr(request, 'session'):
         return
     from shop.views.cart import merge_session_cart_into_user_cart
+
     merge_session_cart_into_user_cart(request, user)

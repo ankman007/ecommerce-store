@@ -1,4 +1,5 @@
 """Settings for running the test suite: SQLite, eager Celery, no real email or Stripe."""
+
 import os
 
 os.environ.setdefault('SECRET_KEY', 'test-secret-key')

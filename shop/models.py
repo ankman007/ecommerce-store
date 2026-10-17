@@ -28,33 +28,22 @@ class Category(models.Model):
 
 
 class Product(models.Model):
-    id = models.CharField(
-        primary_key=True,
-        max_length=22,
-        unique=True,
-        default=generate_product_id,
-        editable=False
-    )
+    id = models.CharField(primary_key=True, max_length=22, unique=True, default=generate_product_id, editable=False)
     name = models.CharField(max_length=200)
     description = RichTextField(blank=True)
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='products'
-    )
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     updated_at = models.DateTimeField(auto_now=True)
     stock = models.PositiveIntegerField(default=0)
-    
+
     def save(self, *args, **kwargs):
         self.description = re.sub(r'&nbsp;|<p>|</p>', ' ', self.description).strip()
         super().save(*args, **kwargs)
-    
+
     def __str__(self):
         category_name = self.category.name if self.category else "Uncategorized"
         return f"Product: {self.name} (Category: {category_name})"
-    
+
     class Meta:
         ordering = ['-id']
 
@@ -63,7 +52,7 @@ class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
     images = models.ImageField(upload_to='product_images/')
     alt_text = models.CharField(max_length=255, blank=True)
-    
+
     def save(self, *args, **kwargs):
         if not self.alt_text:
             self.alt_text = slugify(self.product.name)
@@ -101,8 +90,8 @@ class Cart(models.Model):
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_product')
-    quantity = models.PositiveIntegerField(default=1) 
-    
+    quantity = models.PositiveIntegerField(default=1)
+
     def subtotal(self):
         return self.quantity * Decimal(self.product.price)
 
@@ -126,7 +115,7 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment by {self.user.username} | ₹{self.total_price} | Status: {self.get_status_display()}"
-    
+
 
 class Order(models.Model):
     STATUS_PENDING = 'pending'

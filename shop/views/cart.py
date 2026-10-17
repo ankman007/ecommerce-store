@@ -37,9 +37,7 @@ def merge_session_cart_into_user_cart(request, user):
     cart = get_user_cart(user, create=True)
     for product in Product.objects.filter(id__in=session_cart.keys()):
         qty = session_cart[str(product.id)]
-        item, created = CartItem.objects.get_or_create(
-            cart=cart, product=product, defaults={'quantity': 0}
-        )
+        item, created = CartItem.objects.get_or_create(cart=cart, product=product, defaults={'quantity': 0})
         new_qty = min(item.quantity + qty, product.stock)
         if new_qty <= 0:
             item.delete()
@@ -124,9 +122,7 @@ def add_to_cart(request, product_id):
         return response
 
     if product.stock <= 0:
-        cart_count_html = render_to_string("a_shop/partials/cart_count.html", {
-            "cart_count": _cart_count(request)
-        })
+        cart_count_html = render_to_string("a_shop/partials/cart_count.html", {"cart_count": _cart_count(request)})
         return HttpResponse(
             unavailable_btn.replace('{label}', 'Out of stock')
             + cart_count_html
@@ -135,9 +131,7 @@ def add_to_cart(request, product_id):
 
     if request.user.is_authenticated:
         cart = get_user_cart(request.user, create=True)
-        item, _ = CartItem.objects.get_or_create(
-            cart=cart, product=product, defaults={'quantity': 0}
-        )
+        item, _ = CartItem.objects.get_or_create(cart=cart, product=product, defaults={'quantity': 0})
         existing = item.quantity
         new_qty = min(existing + quantity, product.stock)
         item.quantity = new_qty
@@ -163,13 +157,14 @@ def add_to_cart(request, product_id):
             f"Added {quantity} &times; {escape(product.name)} to your cart. "
             "<a href='/cart/' class='text-white text-decoration-underline'>View cart</a>"
         )
-    button_html = render_to_string("a_shop/partials/add_to_cart_button.html", {
-        "product": product,
-        "added": True,
-    })
-    cart_count_html = render_to_string("a_shop/partials/cart_count.html", {
-        "cart_count": total_items
-    })
+    button_html = render_to_string(
+        "a_shop/partials/add_to_cart_button.html",
+        {
+            "product": product,
+            "added": True,
+        },
+    )
+    cart_count_html = render_to_string("a_shop/partials/cart_count.html", {"cart_count": total_items})
     return HttpResponse(button_html + cart_count_html + _toast(message))
 
 

@@ -53,10 +53,10 @@ def create_checkout_session(request):
     # Everything below is built from the DB cart; client-posted fields are ignored.
     for item in items:
         if item.quantity < 1 or item.product.stock < item.quantity:
-            messages.error(request, _toast(
-                f"Sorry, only {item.product.stock} of {item.product.name} in stock. "
-                "Please update your cart."
-            ))
+            messages.error(
+                request,
+                _toast(f"Sorry, only {item.product.stock} of {item.product.name} in stock. Please update your cart."),
+            )
             return redirect('cart')
 
     subtotal = sum((item.product.price * item.quantity for item in items), Decimal('0.00'))
@@ -69,10 +69,12 @@ def create_checkout_session(request):
             shipping_cost=shipping,
             total=subtotal + shipping,
         )
-        OrderItem.objects.bulk_create([
-            OrderItem(order=order, product=item.product, quantity=item.quantity, price=item.product.price)
-            for item in items
-        ])
+        OrderItem.objects.bulk_create(
+            [
+                OrderItem(order=order, product=item.product, quantity=item.quantity, price=item.product.price)
+                for item in items
+            ]
+        )
 
     line_items = [
         {
@@ -86,14 +88,16 @@ def create_checkout_session(request):
         for item in items
     ]
     if shipping:
-        line_items.append({
-            'price_data': {
-                'currency': 'usd',
-                'unit_amount': _to_cents(shipping),
-                'product_data': {'name': 'Shipping'},
-            },
-            'quantity': 1,
-        })
+        line_items.append(
+            {
+                'price_data': {
+                    'currency': 'usd',
+                    'unit_amount': _to_cents(shipping),
+                    'product_data': {'name': 'Shipping'},
+                },
+                'quantity': 1,
+            }
+        )
 
     try:
         checkout_session = stripe.checkout.Session.create(
@@ -139,21 +143,21 @@ def fulfill_checkout_session(checkout_session):
 
         amount_total = _field(checkout_session, 'amount_total')
         if amount_total is not None and int(amount_total) != _to_cents(order.total):
-            logger.error("Amount mismatch for order {}: stripe={} expected={}",
-                         order.id, amount_total, _to_cents(order.total))
+            logger.error(
+                "Amount mismatch for order {}: stripe={} expected={}", order.id, amount_total, _to_cents(order.total)
+            )
             return order, 'amount_mismatch'
 
         for item in order.items.all():
             if not item.product_id:
                 continue
-            updated = Product.objects.filter(
-                pk=item.product_id, stock__gte=item.quantity
-            ).update(stock=F('stock') - item.quantity)
+            updated = Product.objects.filter(pk=item.product_id, stock__gte=item.quantity).update(
+                stock=F('stock') - item.quantity
+            )
             if not updated:
                 # Paid but oversold (concurrent purchase): never go negative; flag for review.
                 Product.objects.filter(pk=item.product_id).update(stock=0)
-                logger.warning("Order {} oversold product {}; needs manual review",
-                               order.id, item.product_id)
+                logger.warning("Order {} oversold product {}; needs manual review", order.id, item.product_id)
 
         order.paid = True
         order.status = Order.STATUS_PAID
@@ -185,7 +189,9 @@ def success(request):
             checkout_session = stripe.checkout.Session.retrieve(session_id)
         except stripe.StripeError:
             logger.exception("Could not retrieve Stripe session {}", session_id)
-            messages.error(request, _toast("Could not verify payment. If you were charged, your order will be confirmed shortly."))
+            messages.error(
+                request, _toast("Could not verify payment. If you were charged, your order will be confirmed shortly.")
+            )
             return redirect('orders')
         _, result = fulfill_checkout_session(checkout_session)
         if result not in ('paid', 'already_paid'):
@@ -219,5 +225,10 @@ def stripe_webhook(request):
 
 
 def cancel(request):
-    messages.info(request, _toast("Payment cancelled &mdash; you haven't been charged. Your cart is saved, so you can check out whenever you're ready."))
+    messages.info(
+        request,
+        _toast(
+            "Payment cancelled &mdash; you haven't been charged. Your cart is saved, so you can check out whenever you're ready."
+        ),
+    )
     return redirect('cart')

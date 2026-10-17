@@ -11,10 +11,15 @@ class ContactFormTests(TestCase):
         self.assertContains(resp, 'name="message"')
 
     def test_valid_post_sends_email_and_redirects(self):
-        resp = self.client.post(reverse('contact'), {
-            'name': 'Bob', 'email': 'bob@example.com',
-            'subject': 'Hi', 'message': 'Hello there',
-        })
+        resp = self.client.post(
+            reverse('contact'),
+            {
+                'name': 'Bob',
+                'email': 'bob@example.com',
+                'subject': 'Hi',
+                'message': 'Hello there',
+            },
+        )
         self.assertRedirects(resp, reverse('home'), fetch_redirect_response=False)
         self.assertEqual(len(mail.outbox), 1)
         msg = mail.outbox[0]
@@ -24,9 +29,14 @@ class ContactFormTests(TestCase):
         self.assertEqual(msg.to, ['owner@example.com'])
 
     def test_invalid_post_rerenders_with_errors_and_sends_nothing(self):
-        resp = self.client.post(reverse('contact'), {
-            'name': '', 'email': 'not-an-email', 'message': '',
-        })
+        resp = self.client.post(
+            reverse('contact'),
+            {
+                'name': '',
+                'email': 'not-an-email',
+                'message': '',
+            },
+        )
         self.assertEqual(resp.status_code, 200)
         errors = resp.context['form'].errors
         self.assertIn('email', errors)

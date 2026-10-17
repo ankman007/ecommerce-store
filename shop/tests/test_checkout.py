@@ -13,6 +13,7 @@ from shop.views.payment import fulfill_checkout_session
 
 class FakeSession(dict):
     """Behaves like a StripeObject: item and attribute access."""
+
     __getattr__ = dict.get
 
 
@@ -171,8 +172,9 @@ class WebhookTests(CheckoutBase):
         self.checkout()
 
     def post_webhook(self, signature='t=1,v1=x'):
-        return self.client.post(reverse('stripe_webhook'), data='{}', content_type='application/json',
-                                HTTP_STRIPE_SIGNATURE=signature)
+        return self.client.post(
+            reverse('stripe_webhook'), data='{}', content_type='application/json', HTTP_STRIPE_SIGNATURE=signature
+        )
 
     def test_no_secret_configured_rejects(self):
         with self.settings(STRIPE_WEBHOOK_SECRET=None), patch.dict('os.environ', {'STRIPE_WEBHOOK_SECRET': ''}):
@@ -188,8 +190,10 @@ class WebhookTests(CheckoutBase):
 
     def test_signed_completed_event_marks_paid(self):
         event = {'type': 'checkout.session.completed', 'data': {'object': self.paid_session()}}
-        with self.settings(STRIPE_WEBHOOK_SECRET='whsec_test'), \
-                patch('shop.views.payment.stripe.Webhook.construct_event', return_value=event):
+        with (
+            self.settings(STRIPE_WEBHOOK_SECRET='whsec_test'),
+            patch('shop.views.payment.stripe.Webhook.construct_event', return_value=event),
+        ):
             resp = self.post_webhook('t=1,v1=ok')
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(Order.objects.get().paid)
@@ -233,6 +237,7 @@ class CartTests(TestCase):
 
     def test_guest_cart_merged_on_login(self):
         from allauth.account.signals import user_logged_in
+
         user = User.objects.create_user('carol', 'carol@example.com', 'pw')
         cart = Cart.objects.create(user=user)
         CartItem.objects.create(cart=cart, product=self.product, quantity=1)

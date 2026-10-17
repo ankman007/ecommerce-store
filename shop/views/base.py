@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from shop.utils import check_product_for_cart, product_grid_queryset
 from shop.tasks import send_contact_email
 
+
 def home(request):
     products = product_grid_queryset()
     categories = Category.objects.annotate(product_count=Count('products'))
@@ -16,7 +17,7 @@ def home(request):
     context = {
         'products': products,
         'categories': categories,
-        'cart_product_ids': cart_product_ids,  
+        'cart_product_ids': cart_product_ids,
     }
     return render(request, 'a_shop/home.html', context)
 
@@ -25,7 +26,6 @@ def contact(request):
     if request.method == "POST":
         form = ContactForm(request.POST)
         if form.is_valid():
-            
             subject = f"New contact us message from {form.cleaned_data['name']}"
             if form.cleaned_data.get('subject'):
                 subject += f": {form.cleaned_data['subject']}"
@@ -34,7 +34,9 @@ def contact(request):
 
             send_contact_email.delay(sender_email, subject, message)
 
-            toast_message = "Your message has been sent successfully! <a href='/contact/' class='underline'>Send another?</a>"
+            toast_message = (
+                "Your message has been sent successfully! <a href='/contact/' class='underline'>Send another?</a>"
+            )
             toast_html = render_to_string("a_shop/partials/toast.html", {"message": toast_message})
             messages.success(request, toast_html)
             return redirect('home')

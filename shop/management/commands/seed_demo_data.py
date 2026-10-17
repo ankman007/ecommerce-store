@@ -13,35 +13,109 @@ from shop.models import Category, Product, ProductImage
 
 # (category, colour, [(name, price, stock, description, image_count)])
 CATALOG = [
-    ("Electronics", (37, 99, 235), [
-        ("Wireless Noise-Cancelling Headphones", "129.99", 25, "Over-ear Bluetooth headphones with 30-hour battery life and active noise cancellation.", 3),
-        ("Mechanical Keyboard", "89.50", 40, "Tenkeyless keyboard with hot-swappable switches and RGB backlighting.", 2),
-        ("4K Action Camera", "199.00", 8, "Waterproof action camera that records 4K at 60fps with electronic stabilisation.", 1),
-        ("USB-C Fast Charger 65W", "34.99", 120, "Compact GaN charger that powers laptops, tablets and phones.", 1),
-    ]),
-    ("Clothing", (219, 39, 119), [
-        ("Classic Denim Jacket", "74.00", 30, "Mid-wash denim jacket with a relaxed fit and brass buttons.", 2),
-        ("Organic Cotton T-Shirt", "19.99", 200, "Soft crew-neck tee made from 100% organic cotton.", 1),
-        ("Waterproof Hiking Boots", "119.00", 3, "Leather hiking boots with a waterproof membrane and grippy soles.", 2),
-        ("Wool Beanie", "15.00", 0, "Warm ribbed beanie knitted from merino wool.", 1),
-    ]),
-    ("Home & Kitchen", (5, 150, 105), [
-        ("Pour-Over Coffee Set", "42.00", 18, "Glass dripper, carafe and 100 paper filters for a clean, bright brew.", 2),
-        ("Cast Iron Skillet 12\"", "39.95", 50, "Pre-seasoned cast iron skillet for searing, baking and frying.", 1),
-        ("Linen Throw Blanket", "55.00", 22, "Stone-washed linen throw that gets softer with every wash.", 1),
-        ("Smart LED Desk Lamp", "48.99", 35, "Dimmable desk lamp with adjustable colour temperature and USB charging.", 2),
-    ]),
-    ("Books", (217, 119, 6), [
-        ("The Pragmatic Programmer", "44.99", 60, "Classic guide to becoming a better, more effective software developer.", 1),
-        ("Designing Data-Intensive Applications", "52.00", 14, "Deep dive into the principles behind reliable, scalable data systems.", 1),
-        ("Atomic Habits", "16.99", 90, "Practical strategies for building good habits and breaking bad ones.", 1),
-    ]),
-    ("Sports & Outdoors", (124, 58, 237), [
-        ("Yoga Mat Pro", "29.99", 75, "6mm non-slip yoga mat with alignment markings and carry strap.", 2),
-        ("Insulated Water Bottle", "24.50", 150, "Stainless steel bottle that keeps drinks cold for 24 hours.", 1),
-        ("Adjustable Dumbbell Pair", "159.00", 6, "Space-saving dumbbells that adjust from 2.5 to 24kg.", 2),
-        ("Camping Hammock", "36.00", 0, "Lightweight parachute-nylon hammock with tree straps included.", 1),
-    ]),
+    (
+        "Electronics",
+        (37, 99, 235),
+        [
+            (
+                "Wireless Noise-Cancelling Headphones",
+                "129.99",
+                25,
+                "Over-ear Bluetooth headphones with 30-hour battery life and active noise cancellation.",
+                3,
+            ),
+            (
+                "Mechanical Keyboard",
+                "89.50",
+                40,
+                "Tenkeyless keyboard with hot-swappable switches and RGB backlighting.",
+                2,
+            ),
+            (
+                "4K Action Camera",
+                "199.00",
+                8,
+                "Waterproof action camera that records 4K at 60fps with electronic stabilisation.",
+                1,
+            ),
+            ("USB-C Fast Charger 65W", "34.99", 120, "Compact GaN charger that powers laptops, tablets and phones.", 1),
+        ],
+    ),
+    (
+        "Clothing",
+        (219, 39, 119),
+        [
+            ("Classic Denim Jacket", "74.00", 30, "Mid-wash denim jacket with a relaxed fit and brass buttons.", 2),
+            ("Organic Cotton T-Shirt", "19.99", 200, "Soft crew-neck tee made from 100% organic cotton.", 1),
+            (
+                "Waterproof Hiking Boots",
+                "119.00",
+                3,
+                "Leather hiking boots with a waterproof membrane and grippy soles.",
+                2,
+            ),
+            ("Wool Beanie", "15.00", 0, "Warm ribbed beanie knitted from merino wool.", 1),
+        ],
+    ),
+    (
+        "Home & Kitchen",
+        (5, 150, 105),
+        [
+            (
+                "Pour-Over Coffee Set",
+                "42.00",
+                18,
+                "Glass dripper, carafe and 100 paper filters for a clean, bright brew.",
+                2,
+            ),
+            (
+                "Cast Iron Skillet 12\"",
+                "39.95",
+                50,
+                "Pre-seasoned cast iron skillet for searing, baking and frying.",
+                1,
+            ),
+            ("Linen Throw Blanket", "55.00", 22, "Stone-washed linen throw that gets softer with every wash.", 1),
+            (
+                "Smart LED Desk Lamp",
+                "48.99",
+                35,
+                "Dimmable desk lamp with adjustable colour temperature and USB charging.",
+                2,
+            ),
+        ],
+    ),
+    (
+        "Books",
+        (217, 119, 6),
+        [
+            (
+                "The Pragmatic Programmer",
+                "44.99",
+                60,
+                "Classic guide to becoming a better, more effective software developer.",
+                1,
+            ),
+            (
+                "Designing Data-Intensive Applications",
+                "52.00",
+                14,
+                "Deep dive into the principles behind reliable, scalable data systems.",
+                1,
+            ),
+            ("Atomic Habits", "16.99", 90, "Practical strategies for building good habits and breaking bad ones.", 1),
+        ],
+    ),
+    (
+        "Sports & Outdoors",
+        (124, 58, 237),
+        [
+            ("Yoga Mat Pro", "29.99", 75, "6mm non-slip yoga mat with alignment markings and carry strap.", 2),
+            ("Insulated Water Bottle", "24.50", 150, "Stainless steel bottle that keeps drinks cold for 24 hours.", 1),
+            ("Adjustable Dumbbell Pair", "159.00", 6, "Space-saving dumbbells that adjust from 2.5 to 24kg.", 2),
+            ("Camping Hammock", "36.00", 0, "Lightweight parachute-nylon hammock with tree straps included.", 1),
+        ],
+    ),
 ]
 
 CUSTOMER_EMAIL = "customer@example.com"
@@ -77,7 +151,9 @@ def make_image(name, colour, variant):
     for i, text in enumerate(lines):
         draw.text((450, 670 + i * 56), text, font=small, fill=(255, 255, 255), anchor="mm")
     if variant:
-        draw.text((450, 840), f"view {variant + 1}", font=ImageFont.load_default(size=30), fill=(255, 255, 255), anchor="mm")
+        draw.text(
+            (450, 840), f"view {variant + 1}", font=ImageFont.load_default(size=30), fill=(255, 255, 255), anchor="mm"
+        )
 
     buffer = BytesIO()
     img.save(buffer, format="JPEG", quality=85)
@@ -122,8 +198,10 @@ class Command(BaseCommand):
             user=customer, email=CUSTOMER_EMAIL, defaults={"primary": True, "verified": True}
         )
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Created {created} products ({Product.objects.count()} total, "
-            f"{Category.objects.count()} categories). "
-            f"Customer login: {CUSTOMER_EMAIL} / {CUSTOMER_PASSWORD}"
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Created {created} products ({Product.objects.count()} total, "
+                f"{Category.objects.count()} categories). "
+                f"Customer login: {CUSTOMER_EMAIL} / {CUSTOMER_PASSWORD}"
+            )
+        )

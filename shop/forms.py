@@ -34,9 +34,11 @@ class ContactForm(forms.Form):
         min_length=10,
         max_length=5000,
         strip=True,
-        widget=forms.Textarea(attrs={
-            'class': INPUT_CLASSES,
-            'placeholder': 'Write your message here...',
-            'rows': 5,
-        }),
+        widget=forms.Textarea(
+            attrs={
+                'class': INPUT_CLASSES,
+                'placeholder': 'Write your message here...',
+                'rows': 5,
+            }
+        ),
     )

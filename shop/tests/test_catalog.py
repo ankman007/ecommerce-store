@@ -10,12 +10,11 @@ class CatalogTests(TestCase):
     def setUpTestData(cls):
         cls.electronics = make_category('Electronics')
         cls.books = make_category('Books')
-        cls.phone = make_product('Smartphone X', price='299.99', category=cls.electronics,
-                                 description='A great phone', with_image=True)
-        cls.laptop = make_product('Laptop Pro', price='999.00', category=cls.electronics,
-                                  description='Powerful laptop')
-        cls.novel = make_product('Mystery Novel', price='15.00', category=cls.books,
-                                 description='Thrilling read')
+        cls.phone = make_product(
+            'Smartphone X', price='299.99', category=cls.electronics, description='A great phone', with_image=True
+        )
+        cls.laptop = make_product('Laptop Pro', price='999.00', category=cls.electronics, description='Powerful laptop')
+        cls.novel = make_product('Mystery Novel', price='15.00', category=cls.books, description='Thrilling read')
 
     def test_home_lists_all_products(self):
         resp = self.client.get(reverse('home'))

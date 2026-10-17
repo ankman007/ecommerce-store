@@ -1,4 +1,5 @@
 """Storefront UX: shared footer data, order pages, cancel flow and add-to-cart feedback."""
+
 from decimal import Decimal
 
 from django.test import TestCase
@@ -33,8 +34,12 @@ class OrderPagesTests(TestCase):
         self.user = make_user('alice')
         self.product = make_product(name='Lamp', price='20.00')
         self.order = Order.objects.create(
-            user=self.user, paid=True, status=Order.STATUS_PAID, paid_at=timezone.now(),
-            shipping_cost=Decimal('5.00'), total=Decimal('45.00'),
+            user=self.user,
+            paid=True,
+            status=Order.STATUS_PAID,
+            paid_at=timezone.now(),
+            shipping_cost=Decimal('5.00'),
+            total=Decimal('45.00'),
         )
         OrderItem.objects.create(order=self.order, product=self.product, quantity=2, price=Decimal('20.00'))
 
