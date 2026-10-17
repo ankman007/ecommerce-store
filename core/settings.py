@@ -312,8 +312,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_TASK_TRACK_STARTED = True
 CELERY_WORKER_SEND_TASK_EVENTS = True  # lets Flower show task events
 CELERY_TIMEZONE = 'UTC'
-# Keep Django's LOGGING (above) in charge of worker output instead of Celery replacing root handlers.
-CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+# Worker/beat logging is left to LOGGING above (see core.celery_app.use_django_logging).
 CELERY_BEAT_SCHEDULE = {
     # Cancel abandoned checkouts and catch any payment whose webhook was missed.
     'expire-stale-checkouts': {

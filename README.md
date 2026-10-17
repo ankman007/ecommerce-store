@@ -76,7 +76,7 @@ In production, add the endpoint `https://<your-domain>/stripe/webhook/` in the S
 
 Email uses Django's `MAILERS` setting, built from the same `.env` variables as before (`EMAIL_BACKEND`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `RECIPIENT_EMAIL`; optional `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_TIMEOUT`, `DEFAULT_FROM_EMAIL`). Mail is sent from `DEFAULT_FROM_EMAIL`, which defaults to `EMAIL_HOST_USER`.
 
-All logs go to the console (`docker compose logs`). Set `LOG_LEVEL` (default `INFO`) to change the level. Messages logged with loguru are passed to Python's standard `logging`, so they use the same format and level. Tests run with `LOG_LEVEL=CRITICAL` unless you set it yourself.
+All logs go to the console (`docker compose logs`). Set `LOG_LEVEL` (default `INFO`) to change the level. Messages logged with loguru are passed to Python's standard `logging`, so they use the same format and level. Celery workers and beat use this config too, so `LOG_LEVEL` replaces their `--loglevel` flag. Tests run with `LOG_LEVEL=CRITICAL` unless you set it yourself.
 
 ### Continuous integration
 

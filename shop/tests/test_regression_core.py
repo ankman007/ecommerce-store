@@ -194,9 +194,18 @@ class EntryPointTests(SimpleTestCase):
         self.assertEqual(celery_app.main, 'core')
         self.assertIn('expire-stale-checkouts', celery_app.conf.beat_schedule)
         self.assertEqual(celery_app.conf.task_serializer, 'json')
-        self.assertFalse(celery_app.conf.worker_hijack_root_logger)
+        self.assertTrue(celery_app.conf.task_always_eager)  # test settings
         self.assertTrue(celery_app.conf.task_track_started)
         self.assertTrue(celery_app.conf.worker_send_task_events)
+
+    def test_celery_leaves_logging_to_django(self):
+        from celery.signals import setup_logging
+
+        from core.celery_app import use_django_logging
+
+        # Celery only installs its own handlers when nobody answers this signal.
+        responses = setup_logging.send(sender=None, loglevel='INFO', logfile=None, format='', colorize=False)
+        self.assertIn(use_django_logging, [receiver for receiver, _ in responses])
 
 
 class CreateAdminScriptTests(TestCase):
