@@ -78,3 +78,9 @@ In production, add the endpoint `https://<your-domain>/stripe/webhook/` in the S
 
 - **Lint:** `ruff check` and `ruff format --check`
 - **Tests:** Django system checks, a missing-migrations check, then the full test suite
+
+## Production deployment
+
+Production runs `docker-compose.prod.yml`: gunicorn behind nginx (which also serves uploaded media), a Celery worker and beat, MySQL and Redis, from images that the manual **Deploy** workflow (`.github/workflows/deploy.yml`) tests, builds and pushes to GHCR, then deploys over SSH after approval on the `production` environment. Configuration lives in `.env.prod` (template: `.env.prod.example`) and is validated by `python manage.py check_env` before every migration.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for server setup, TLS, the Stripe webhook, backups and rollback.
