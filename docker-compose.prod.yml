@@ -1,0 +1,169 @@
+# Production stack. See docs/DEPLOYMENT.md.
+#
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml pull
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml run --rm migrate
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d
+#
+# --env-file feeds ${...} interpolation below; env_file feeds the containers. Both read .env.prod.
+# No bind mounts: code and nginx config are baked into the images, data lives in named volumes.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app: &app
+  # CI pushes ghcr.io/<owner>/<repo>:sha-<commit>; the deploy job sets APP_IMAGE to that tag.
+  image: ${APP_IMAGE:-ecommerce-store:prod}
+  pull_policy: missing
+  env_file:
+    - path: ${ENV_FILE:-.env.prod}
+      required: true
+  environment:
+    DJANGO_SETTINGS_MODULE: core.settings
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  # One-off: validate the environment, then apply migrations. web/celery wait for it to succeed.
+  migrate:
+    <<: *app
+    command: >
+      sh -c "python manage.py check_env &&
+             python manage.py check --deploy &&
+             python manage.py migrate --noinput"
+    restart: "no"
+    healthcheck:
+      disable: true
+    volumes:
+      # Mounted here first so the new volume is created owned by the app user (from the image).
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    build:
+      context: .
+    # Same as the image default; spelled out so it's obvious what runs.
+    command: gunicorn --config deploy/gunicorn.conf.py core.wsgi:application
+    volumes:
+      - media:/app/media
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # The image's HEALTHCHECK (deploy/healthcheck.py) applies.
+
+  celery:
+    <<: *app
+    command: celery -A core worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-2}
+    volumes:
+      - media:/app/media
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping --destination celery@$$HOSTNAME --timeout 10 > /dev/null"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    <<: *app
+    # Exactly one beat process. Schedule state lives in /tmp, not in the image.
+    command: celery -A core beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    healthcheck: &broker-healthcheck
+      # Beat has no endpoint to probe; it is only useful while it can reach the broker.
+      test: ["CMD", "python", "-c", "import os, redis; redis.Redis.from_url(os.environ['CELERY_BROKER_URL']).ping()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: ${NGINX_IMAGE:-ecommerce-store-nginx:prod}
+    pull_policy: missing
+    build:
+      context: deploy/nginx
+    ports:
+      # Plain HTTP. Put TLS in front (see docs/DEPLOYMENT.md); when a host-level proxy terminates
+      # TLS, set NGINX_HTTP_BIND=127.0.0.1 so this port isn't reachable from outside.
+      - "${NGINX_HTTP_BIND:-0.0.0.0}:${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - media:/srv/media:ro
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      web:
+        condition: service_healthy
+
+  # Optional task monitor: `--profile monitoring up -d flower`, then reach it over an SSH tunnel.
+  # Bound to 127.0.0.1 only; set FLOWER_BASIC_AUTH=user:password in .env.prod as well.
+  flower:
+    <<: *app
+    profiles: ["monitoring"]
+    command: celery -A core flower --port=5555
+    ports:
+      - "127.0.0.1:${FLOWER_PORT:-5555}:5555"
+    healthcheck: *broker-healthcheck
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:8-alpine
+    # Append-only file so queued tasks (e.g. order emails) survive a restart.
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:?set DB_NAME in .env.prod}
+      MYSQL_USER: ${DB_USER:?set DB_USER in .env.prod}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env.prod}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env.prod}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # MYSQL_PWD keeps the password off the command line; 127.0.0.1 forces TCP so the check
+      # only passes once the real server (not the init server) is up.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  mysql_data:
+  redis_data:
+  media:

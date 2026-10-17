@@ -6,6 +6,9 @@ db.sqlite3
 .env
 .DS_Store
 staticfiles/
+.env.*
+!.env.example
+!.env.prod.example
 
 # Claude Code local state (agent worktrees, settings)
 .claude/

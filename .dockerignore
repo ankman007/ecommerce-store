@@ -9,3 +9,9 @@ __pycache__/
 media/
 staticfiles/
 db.sqlite3
+.env.*
+.claude/
+.ruff_cache/
+.coverage
+htmlcov/
+docs/
