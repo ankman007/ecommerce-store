@@ -30,10 +30,21 @@ class CheckoutBase(TestCase):
         self.cart = Cart.objects.create(user=self.user)
         CartItem.objects.create(cart=self.cart, product=self.product, quantity=2)
 
+    # Checkout now requires a shipping address (see test_checkout_address.py).
+    ADDRESS = {
+        'full_name': 'Alice Example',
+        'phone': '+1 518 555 0100',
+        'address_line1': '1 Main St',
+        'city': 'Albany',
+        'state': 'NY',
+        'postal_code': '12207',
+        'country': 'US',
+    }
+
     def checkout(self, data=None, session_id='cs_test_1'):
         with patch('shop.views.payment.stripe.checkout.Session.create') as create:
             create.return_value = FakeSession(id=session_id, url='https://checkout.stripe.test/pay')
-            resp = self.client.post(reverse('checkout'), data or {})
+            resp = self.client.post(reverse('checkout'), {**self.ADDRESS, **(data or {})})
         return resp, create
 
     def paid_session(self, session_id='cs_test_1', amount=None, status='paid'):

@@ -1,5 +1,6 @@
 import os
 from datetime import timedelta
+from functools import partial
 from decimal import Decimal
 
 import stripe
@@ -8,7 +9,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import F
 from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -16,7 +17,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from loguru import logger
 
+from shop.forms import ShippingAddressForm
 from shop.models import Order, OrderItem, Product, CartItem
+from shop.tasks import send_order_confirmation, send_order_status_email
 from shop.views.cart import SHIPPING_COST, get_user_cart
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -52,6 +55,62 @@ def _toast(message):
     return render_to_string("a_shop/partials/toast.html", {"message": message})
 
 
+def _checkout_cart_items(request):
+    """Validate the user's DB cart for checkout. Returns (items, error_redirect)."""
+    cart = get_user_cart(request.user)
+    items = list(cart.items.select_related('product')) if cart else []
+    if not items:
+        messages.error(request, _toast("Your cart is empty."))
+        return None, redirect('cart')
+    for item in items:
+        if item.quantity < 1 or item.product.stock < item.quantity:
+            messages.error(
+                request,
+                _toast(f"Sorry, only {item.product.stock} of {item.product.name} in stock. Please update your cart."),
+            )
+            return None, redirect('cart')
+    return items, None
+
+
+def _initial_address(user):
+    """Prefill the address form from the user's most recent order that has an address."""
+    last = (
+        Order.objects.filter(user=user)
+        .exclude(address_line1='')
+        .order_by('-created_at')
+        .values(*Order.ADDRESS_FIELDS)
+        .first()
+    )
+    if last:
+        return last
+    return {'full_name': user.get_full_name(), 'country': 'US'}
+
+
+def _render_address_page(request, form, items, status=200):
+    subtotal = sum((item.product.price * item.quantity for item in items), Decimal('0.00'))
+    context = {
+        'form': form,
+        'items': items,
+        'subtotal': subtotal,
+        'shipping_cost': SHIPPING_COST,
+        'total': subtotal + SHIPPING_COST,
+    }
+    return render(request, 'a_shop/checkout.html', context, status=status)
+
+
+def checkout_address(request):
+    """Checkout step 1: collect the shipping address and phone, then start Stripe Checkout."""
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('account_login')}?next={reverse('checkout_address')}")
+    if request.method == "POST":
+        return create_checkout_session(request)
+    items, error = _checkout_cart_items(request)
+    if error:
+        return error
+    form = ShippingAddressForm(initial=_initial_address(request.user))
+    return _render_address_page(request, form, items)
+
+
 def create_checkout_session(request):
     # GET (e.g. after "Login to Checkout") → send the user to their cart instead of a 400.
     if request.method != "POST":
@@ -59,20 +118,15 @@ def create_checkout_session(request):
     if not request.user.is_authenticated:
         return redirect(f"{reverse('account_login')}?next={reverse('cart')}")
 
-    cart = get_user_cart(request.user)
-    items = list(cart.items.select_related('product')) if cart else []
-    if not items:
-        messages.error(request, _toast("Your cart is empty."))
-        return redirect('cart')
+    # Everything below is built from the DB cart; client-posted item fields are ignored.
+    items, error = _checkout_cart_items(request)
+    if error:
+        return error
 
-    # Everything below is built from the DB cart; client-posted fields are ignored.
-    for item in items:
-        if item.quantity < 1 or item.product.stock < item.quantity:
-            messages.error(
-                request,
-                _toast(f"Sorry, only {item.product.stock} of {item.product.name} in stock. Please update your cart."),
-            )
-            return redirect('cart')
+    form = ShippingAddressForm(request.POST)
+    if not form.is_valid():
+        return _render_address_page(request, form, items, status=400 if request.POST else 200)
+    address = {field: form.cleaned_data.get(field) or '' for field in Order.ADDRESS_FIELDS}
 
     subtotal = sum((item.product.price * item.quantity for item in items), Decimal('0.00'))
     shipping = SHIPPING_COST
@@ -83,6 +137,7 @@ def create_checkout_session(request):
             paid=False,
             shipping_cost=shipping,
             total=subtotal + shipping,
+            **address,
         )
         OrderItem.objects.bulk_create(
             [
@@ -124,6 +179,7 @@ def create_checkout_session(request):
             success_url=request.build_absolute_uri(reverse('success')) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=request.build_absolute_uri(reverse('cancel')),
             expires_at=int((timezone.now() + CHECKOUT_SESSION_TTL).timestamp()),
+            payment_intent_data={'shipping': _stripe_shipping(order)},
         )
     except stripe.StripeError:
         logger.exception("Stripe checkout session creation failed for order {}", order.id)
@@ -135,6 +191,23 @@ def create_checkout_session(request):
     order.stripe_session_id = _field(checkout_session, 'id')
     order.save(update_fields=['stripe_session_id'])
     return redirect(_field(checkout_session, 'url'))
+
+
+def _stripe_shipping(order):
+    """The order's address snapshot in Stripe's `shipping` shape (shown on the payment in Stripe)."""
+    address = {
+        'line1': order.address_line1,
+        'line2': order.address_line2,
+        'city': order.city,
+        'state': order.state,
+        'postal_code': order.postal_code,
+        'country': order.country,
+    }
+    return {
+        'name': order.full_name,
+        'phone': order.phone,
+        'address': {key: value for key, value in address.items() if value},
+    }
 
 
 def fulfill_checkout_session(checkout_session):
@@ -188,6 +261,9 @@ def fulfill_checkout_session(checkout_session):
         order.status = Order.STATUS_PAID
         order.paid_at = timezone.now()
         order.save(update_fields=['paid', 'status', 'paid_at'])
+        # Only reached once per order (paid is checked under the row lock above); the task
+        # also claims confirmation_sent_at, so a re-delivered webhook can never email twice.
+        transaction.on_commit(partial(send_order_confirmation.delay, order.id))
         if oversold:
             _flag_for_review(order, "Paid, but stock ran out for: " + ", ".join(oversold))
 
@@ -292,4 +368,5 @@ def refund_order(order):
     stripe.Refund.create(payment_intent=order.stripe_payment_intent, idempotency_key=f"refund-order-{order.pk}")
     order.status = Order.STATUS_REFUNDED
     order.save(update_fields=['status'])
+    transaction.on_commit(partial(send_order_status_email.delay, order.id, 'refunded'))
     return order

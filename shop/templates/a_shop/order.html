@@ -1,4 +1,6 @@
 {% extends 'layouts/blank.html' %}
+{% block title %}Your orders | A One Albany Wholesale{% endblock %}
+{% block meta_extra %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
 <div class="container my-5" style="max-width: 960px;">
   <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
@@ -22,7 +24,7 @@
         {% for item in order.items.all|slice:":4" %}
           {% with image=item.product.images.all.0 %}
           <span class="order-thumb rounded-3 d-flex align-items-center justify-content-center" title="{{ item.quantity }} × {{ item.product.name|default:'Deleted product' }}">
-            {% if image %}<img src="{{ image.images.url }}" alt="">{% else %}<i class="bi bi-image text-muted"></i>{% endif %}
+            {% if image %}<img src="{{ image.images.url }}" alt="" loading="lazy" decoding="async" width="64" height="64">{% else %}<i class="bi bi-image text-muted"></i>{% endif %}
           </span>
           {% endwith %}
         {% endfor %}

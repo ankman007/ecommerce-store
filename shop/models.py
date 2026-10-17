@@ -7,6 +7,8 @@ from PIL import Image
 from io import BytesIO
 import re
 from django.core.files.base import ContentFile
+from django.urls import reverse
+from django.utils import timezone
 import shortuuid
 
 
@@ -23,6 +25,9 @@ class Category(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
+    def get_absolute_url(self):
+        return reverse('category', args=[self.slug])
+
     def __str__(self):
         return f"Category: {self.name}"
 
@@ -33,8 +38,12 @@ class Product(models.Model):
     description = RichTextField(blank=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     stock = models.PositiveIntegerField(default=0)
+
+    def get_absolute_url(self):
+        return reverse('product_detail', args=[self.id])
 
     def save(self, *args, **kwargs):
         self.description = re.sub(r'&nbsp;|<p>|</p>', ' ', self.description).strip()
@@ -68,6 +77,13 @@ class ProductImage(models.Model):
             output.seek(0)
             self.images = ContentFile(output.read(), self.images.name)
         super().save(*args, **kwargs)
+
+    @property
+    def alt(self):
+        """Alt text for templates: the product name instead of the auto-generated slug."""
+        if self.alt_text and self.alt_text != slugify(self.product.name):
+            return self.alt_text
+        return self.product.name
 
     def has_changed_image(self):
         """Check if image was updated to avoid double compression"""
@@ -158,6 +174,23 @@ class Order(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     paid_at = models.DateTimeField(null=True, blank=True)
 
+    # Shipping snapshot taken at checkout, so later profile/address changes never alter past orders.
+    full_name = models.CharField(max_length=120, blank=True, default='')
+    phone = models.CharField(max_length=30, blank=True, default='')
+    address_line1 = models.CharField('address line 1', max_length=200, blank=True, default='')
+    address_line2 = models.CharField('address line 2', max_length=200, blank=True, default='')
+    city = models.CharField(max_length=100, blank=True, default='')
+    state = models.CharField('state / region', max_length=100, blank=True, default='')
+    postal_code = models.CharField(max_length=20, blank=True, default='')
+    country = models.CharField(max_length=2, blank=True, default='', help_text='ISO 3166-1 alpha-2 code')
+
+    shipped_at = models.DateTimeField(null=True, blank=True)
+    tracking_number = models.CharField(max_length=100, blank=True, default='')
+    # Set when the confirmation email is handed to the mailer; guards against double sends.
+    confirmation_sent_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    ADDRESS_FIELDS = ('full_name', 'phone', 'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country')
+
     class Meta:
         indexes = [
             models.Index(fields=['user', '-created_at'], name='order_user_created_idx'),
@@ -166,6 +199,29 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order #{self.id} by {self.user}"
+
+    @property
+    def has_shipping_address(self):
+        return bool(self.address_line1)
+
+    @property
+    def country_name(self):
+        from shop.forms import COUNTRY_NAMES
+
+        return COUNTRY_NAMES.get(self.country, self.country)
+
+    def shipping_address_lines(self):
+        """The snapshot address as display lines (empty list if none was collected)."""
+        if not self.has_shipping_address:
+            return []
+        region = ' '.join(part for part in (self.state, self.postal_code) if part)
+        city_line = ', '.join(part for part in (self.city, region) if part)
+        lines = [self.full_name, self.address_line1, self.address_line2, city_line, self.country_name]
+        return [line for line in lines if line]
+
+    @property
+    def subtotal(self):
+        return self.total - self.shipping_cost
 
 
 class OrderItem(models.Model):

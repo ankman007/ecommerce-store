@@ -1,0 +1,8 @@
+{% extends 'a_shop/emails/_base.html' %}
+{% block subject %}Order #{{ order.id }} confirmed{% endblock %}
+{% block body %}
+<p>Hi {{ customer_name }},</p>
+<p>Thank you for your order! We've received your payment for order <strong>#{{ order.id }}</strong> and are preparing your items.</p>
+{% include 'a_shop/emails/_order_summary.html' %}
+<p style="margin-top: 16px;">We'll email you again when your order ships.</p>
+{% endblock %}

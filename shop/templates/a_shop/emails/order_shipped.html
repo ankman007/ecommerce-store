@@ -1,0 +1,10 @@
+{% extends 'a_shop/emails/_base.html' %}
+{% block subject %}Your order #{{ order.id }} has shipped{% endblock %}
+{% block body %}
+<p>Hi {{ customer_name }},</p>
+<p>Good news: your order <strong>#{{ order.id }}</strong> has shipped.</p>
+{% if order.tracking_number %}
+<p>Tracking number: <strong>{{ order.tracking_number }}</strong></p>
+{% endif %}
+{% include 'a_shop/emails/_order_summary.html' %}
+{% endblock %}

@@ -1,4 +1,6 @@
 {% extends 'layouts/blank.html' %}
+{% block title %}Order #{{ order.id }} | A One Albany Wholesale{% endblock %}
+{% block meta_extra %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
 <div class="container my-5" style="max-width: 860px;">
   {% if just_placed %}
@@ -35,7 +37,7 @@
       <li class="d-flex align-items-center gap-3 py-3{% if not forloop.last %} border-bottom{% endif %}">
         {% with image=item.product.images.all.0 %}
         <span class="order-thumb rounded-3 d-flex align-items-center justify-content-center">
-          {% if image %}<img src="{{ image.images.url }}" alt="">{% else %}<i class="bi bi-image text-muted"></i>{% endif %}
+          {% if image %}<img src="{{ image.images.url }}" alt="" loading="lazy" decoding="async" width="64" height="64">{% else %}<i class="bi bi-image text-muted"></i>{% endif %}
         </span>
         {% endwith %}
         <div class="flex-grow-1">
@@ -51,13 +53,35 @@
       {% endfor %}
     </ul>
 
+    <div class="row g-4 align-items-start">
+    <div class="col-md-6">
+      {% if order.has_shipping_address %}
+      <h6 class="fw-semibold mb-2">Shipping to</h6>
+      <address class="small text-secondary mb-2" id="order-shipping-address">
+        {% for line in order.shipping_address_lines %}{{ line }}<br>{% endfor %}
+        {% if order.phone %}<i class="bi bi-telephone me-1"></i>{{ order.phone }}{% endif %}
+      </address>
+      {% endif %}
+      {% if order.status == 'shipped' %}
+      <p class="small mb-0">
+        <i class="bi bi-truck me-1"></i>Shipped{% if order.shipped_at %} {{ order.shipped_at|date:"F j, Y" }}{% endif %}
+        {% if order.tracking_number %}&middot; Tracking number: <strong>{{ order.tracking_number }}</strong>{% endif %}
+      </p>
+      {% endif %}
+    </div>
+    <div class="col-md-6">
     <div class="ms-auto" style="max-width: 320px;">
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted">Subtotal</span><span>${{ order.subtotal|floatformat:2 }}</span>
+      </div>
       <div class="d-flex justify-content-between mb-2">
         <span class="text-muted">Shipping</span><span>${{ order.shipping_cost|floatformat:2 }}</span>
       </div>
       <div class="d-flex justify-content-between fw-bold fs-5 border-top pt-2">
         <span>Total paid</span><span>${{ order.total|floatformat:2 }}</span>
       </div>
+    </div>
+    </div>
     </div>
   </div>
 

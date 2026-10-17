@@ -1,7 +1,37 @@
+from functools import partial
+
 from django.shortcuts import get_object_or_404, render
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Prefetch
+from django.utils import timezone
 from shop.models import Order, OrderItem, ProductImage
+
+SHIPPABLE_STATUSES = (Order.STATUS_PAID,)
+
+
+def mark_order_shipped(order, tracking_number=None):
+    """Mark a paid order as shipped (optionally with a tracking number) and email the customer.
+
+    Raises ValueError if the order isn't paid (needs-review orders must be reviewed first).
+    """
+    from shop.tasks import send_order_status_email
+
+    with transaction.atomic():
+        locked = Order.objects.select_for_update().get(pk=order.pk)
+        if locked.status not in SHIPPABLE_STATUSES or not locked.paid:
+            raise ValueError(f"order is {locked.get_status_display().lower()}")
+        locked.status = Order.STATUS_SHIPPED
+        locked.shipped_at = timezone.now()
+        fields = ['status', 'shipped_at']
+        if tracking_number is not None:
+            locked.tracking_number = tracking_number.strip()
+            fields.append('tracking_number')
+        locked.save(update_fields=fields)
+        transaction.on_commit(partial(send_order_status_email.delay, locked.pk, 'shipped'))
+    for field in fields:
+        setattr(order, field, getattr(locked, field))
+    return order
 
 
 def _paid_orders_for(user):

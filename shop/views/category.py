@@ -1,20 +1,13 @@
-from shop.models import Product, Category
-from django.db.models import Count
 from django.shortcuts import get_object_or_404
-from django.shortcuts import render
-from shop.utils import check_product_for_cart, product_grid_queryset
+
+from shop.models import Category, Product
+from shop.views.listing import render_product_listing
 
 
 def category(request, slug):
     selected_category = get_object_or_404(Category, slug=slug)
-    products = product_grid_queryset(Product.objects.filter(category=selected_category))
-    categories = Category.objects.annotate(product_count=Count('products'))
-    cart_product_ids = check_product_for_cart(request)
-
-    context = {
-        'products': products,
-        'categories': categories,
-        'selected_category': selected_category.name,
-        'cart_product_ids': cart_product_ids,
-    }
-    return render(request, 'a_shop/home.html', context)
+    return render_product_listing(
+        request,
+        Product.objects.filter(category=selected_category),
+        {'selected_category': selected_category.name, 'category_obj': selected_category},
+    )

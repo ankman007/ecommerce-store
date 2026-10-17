@@ -1,0 +1,8 @@
+{% extends 'a_shop/emails/_base.html' %}
+{% block subject %}Your order #{{ order.id }} has been refunded{% endblock %}
+{% block body %}
+<p>Hi {{ customer_name }},</p>
+<p>Your order <strong>#{{ order.id }}</strong> has been refunded in full (<strong>${{ order.total|floatformat:2 }}</strong>).</p>
+<p>The refund goes back to your original payment method and usually appears within 5&ndash;10 business days, depending on your bank.</p>
+{% include 'a_shop/emails/_order_summary.html' %}
+{% endblock %}

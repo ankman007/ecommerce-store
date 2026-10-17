@@ -1,0 +1,12 @@
+{% autoescape off %}Hi {{ customer_name }},
+
+Good news: your order #{{ order.id }} has shipped.
+{% if order.tracking_number %}
+Tracking number: {{ order.tracking_number }}
+{% endif %}
+{% include 'a_shop/emails/_order_summary.txt' %}
+View your order: {{ order_url }}
+
+A One Albany Wholesale
+{{ site_url }}
+{% endautoescape %}

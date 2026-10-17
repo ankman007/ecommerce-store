@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from celery import shared_task
 from django.conf import settings
-from django.core.mail import mail_admins, send_mail
+from django.core.mail import EmailMultiAlternatives, mail_admins, send_mail
+from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from loguru import logger
 
@@ -37,6 +39,84 @@ def notify_order_needs_review(order_id, reason):
         send_mail(subject, body, settings.EMAIL_HOST_USER, [recipient], fail_silently=False)
     else:
         mail_admins(subject, body, fail_silently=True)
+
+
+def _from_email():
+    return getattr(settings, 'EMAIL_HOST_USER', None) or settings.DEFAULT_FROM_EMAIL
+
+
+def site_url():
+    """Absolute base URL for links in emails: settings.SITE_URL, else the Sites framework domain."""
+    configured = getattr(settings, 'SITE_URL', None)
+    if configured:
+        return configured.rstrip('/')
+    from django.contrib.sites.models import Site
+
+    protocol = getattr(settings, 'ACCOUNT_DEFAULT_HTTP_PROTOCOL', 'https')
+    return f"{protocol}://{Site.objects.get_current().domain}"
+
+
+def _send_order_email(order, template, subject):
+    """Render a_shop/emails/<template>.txt/.html for the order and send it to the customer."""
+    recipient = order.user.email if order.user else ''
+    if not recipient:
+        logger.warning("Order {} has no customer email; '{}' email not sent", order.id, template)
+        return False
+    base = site_url()
+    context = {
+        'order': order,
+        'items': list(order.items.select_related('product').order_by('id')),
+        'site_url': base,
+        'order_url': base + reverse('order_detail', args=[order.id]),
+        'customer_name': order.full_name or order.user.get_full_name() or order.user.username,
+    }
+    message = EmailMultiAlternatives(
+        subject,
+        render_to_string(f'a_shop/emails/{template}.txt', context),
+        _from_email(),
+        [recipient],
+    )
+    message.attach_alternative(render_to_string(f'a_shop/emails/{template}.html', context), 'text/html')
+    message.send(fail_silently=False)
+    return True
+
+
+@shared_task
+def send_order_confirmation(order_id):
+    """Email the customer their order confirmation, at most once per order."""
+    from shop.models import Order
+
+    # Claim the send first, so repeated or concurrent fulfilment can never email twice.
+    claimed = Order.objects.filter(pk=order_id, paid=True, confirmation_sent_at__isnull=True).update(
+        confirmation_sent_at=timezone.now()
+    )
+    if not claimed:
+        return False
+    order = Order.objects.select_related('user').get(pk=order_id)
+    try:
+        return _send_order_email(order, 'order_confirmation', f"Order #{order.id} confirmed")
+    except Exception:
+        # Release the claim so a retry can send it.
+        Order.objects.filter(pk=order_id).update(confirmation_sent_at=None)
+        raise
+
+
+ORDER_STATUS_EMAILS = {
+    'shipped': ('order_shipped', 'Your order #{id} has shipped'),
+    'refunded': ('order_refunded', 'Your order #{id} has been refunded'),
+}
+
+
+@shared_task
+def send_order_status_email(order_id, kind):
+    """Tell the customer their order was shipped or refunded."""
+    from shop.models import Order
+
+    template, subject = ORDER_STATUS_EMAILS[kind]
+    order = Order.objects.select_related('user').filter(pk=order_id).first()
+    if order is None:
+        return False
+    return _send_order_email(order, template, subject.format(id=order.id))
 
 
 @shared_task

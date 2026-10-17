@@ -1,0 +1,12 @@
+{% autoescape off %}Hi {{ customer_name }},
+
+Thank you for your order! We've received your payment and are preparing your items.
+
+{% include 'a_shop/emails/_order_summary.txt' %}
+We'll email you again when your order ships.
+
+View your order: {{ order_url }}
+
+A One Albany Wholesale
+{{ site_url }}
+{% endautoescape %}

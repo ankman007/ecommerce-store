@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'django_cleanup.apps.CleanupConfig',
     'django_htmx',
     'django.contrib.sites',
+    'django.contrib.sitemaps',
     'allauth',
     'allauth.account',
     'users',
