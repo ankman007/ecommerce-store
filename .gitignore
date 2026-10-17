@@ -6,3 +6,8 @@ db.sqlite3
 .env
 .DS_Store
 staticfiles/
+
+# Claude Code local state (agent worktrees, settings)
+.claude/
+.coverage
+htmlcov/
