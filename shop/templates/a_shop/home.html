@@ -4,14 +4,23 @@
 <div class="container-fluid px-3 px-md-4 px-lg-5 my-5">
   <div class="row gy-4">
     <!-- Product Column -->
-    <div class="col-12 col-lg-9">
-      {% if selected_category %}
-      <h1 class="mb-3">Selected category: {{ selected_category }}</h1>
-      {% elif query %}
-      <h1 class="mb-3">Search Results For: {{ query }}</h1>
-      {% else %}
-      <h1 class="mb-3">All Products</h1>
-      {% endif %}
+    <div class="col-12 col-lg-9 order-2 order-lg-1">
+      <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
+        <div>
+          {% if selected_category %}
+            <p class="text-muted small text-uppercase mb-1" style="letter-spacing: .05em;">Category</p>
+            <h1 class="mb-0">{{ selected_category }}</h1>
+          {% elif query %}
+            <p class="text-muted small text-uppercase mb-1" style="letter-spacing: .05em;">Search results</p>
+            <h1 class="mb-0">&ldquo;{{ query }}&rdquo;</h1>
+          {% else %}
+            <h1 class="mb-0">All Products</h1>
+          {% endif %}
+        </div>
+        {% if products %}
+          <span class="text-muted small">{{ products|length }} product{{ products|length|pluralize }}</span>
+        {% endif %}
+      </div>
 
       {% if products %}
       <div class="row g-4">
@@ -20,64 +29,69 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="alert alert-danger" role="alert">
-        No products available in this category at the moment.
+      <div class="text-center bg-light rounded-4 py-5 px-3">
+        <i class="bi bi-search fs-1 text-muted d-block mb-3"></i>
+        {% if query %}
+          <h2 class="fw-semibold">No products match &ldquo;{{ query }}&rdquo;</h2>
+          <p class="text-muted">Check the spelling or try a more general term.</p>
+        {% elif selected_category %}
+          <h2 class="fw-semibold">Nothing in {{ selected_category }} yet</h2>
+          <p class="text-muted">New products are added regularly &mdash; check back soon.</p>
+        {% else %}
+          <h2 class="fw-semibold">No products yet</h2>
+          <p class="text-muted">Our catalogue is being stocked. Please check back soon.</p>
+        {% endif %}
+        <a href="{% url 'home' %}" class="btn btn-dark px-4">Browse all products</a>
       </div>
       {% endif %}
     </div>
 
     <!-- Sidebar -->
-    <div class="col-12 col-md-12 col-lg-3">
-      <div
-        class="card rounded-4 px-3 py-3 hover-shadow"
-        style="
-          background-color: #f9f9f9;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-          transition: box-shadow 0.3s ease;
-        "
-      >
-        <div class="card-header bg-dark text-white rounded-top-3">
-          <h5 class="mb-0">Categories</h5>
-        </div>
-        <div class="card-body">
-          <ul class="list-unstyled mb-0">
-            {% for category in categories %}
-            <li>
-              <a
-                href="{% url 'category' category.slug %}"
-                class="category-link d-block py-2 px-3 rounded text-dark text-decoration-none fw-semibold transition"
-                style="transition: background-color 0.3s, color 0.3s"
-                onmouseover="this.style.backgroundColor='#f0f0f0'; this.style.color='#1a1a1a';"
-                onmouseout="this.style.backgroundColor=''; this.style.color='';"
-              >
-                {{ category.name }}
-                <span class="badge bg-dark rounded-pill float-end">
-                  {{ category.product_count }}
-                </span>
-              </a>
-            </li>
-            {% endfor %}
-          </ul>
-        </div>
+    <div class="col-12 col-lg-3 order-1 order-lg-2">
+      <div class="card border-0 rounded-4 p-3 product-card" style="transform: none;">
+        <h5 class="fw-semibold px-2 pt-1 mb-3">Categories</h5>
+        <ul class="list-unstyled mb-0">
+          <li>
+            <a href="{% url 'home' %}"
+              class="category-link d-flex justify-content-between align-items-center py-2 px-3 rounded text-decoration-none{% if not selected_category and not query %} active{% endif %}">
+              All products
+            </a>
+          </li>
+          {% for category in categories %}
+          <li>
+            <a href="{% url 'category' category.slug %}"
+              class="category-link d-flex justify-content-between align-items-center py-2 px-3 rounded text-decoration-none{% if category.name == selected_category %} active{% endif %}"
+              {% if category.name == selected_category %}aria-current="page"{% endif %}>
+              <span>{{ category.name }}</span>
+              {% if category.product_count is not None %}
+              <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">{{ category.product_count }}</span>
+              {% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
       </div>
     </div>
   </div>
 </div>
 
 <style>
-  .hover-shadow:hover {
-    box-shadow: 0 10px 20px rgb(0 0 0 / 0.1);
+  .category-link {
+    color: #212529;
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s;
   }
-
-  .transition {
-    transition: all 0.3s ease;
+  .category-link:hover {
+    background-color: #eef0f3;
+    color: #111;
   }
-
-  .card-text.text-truncate {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  .category-link.active {
+    background-color: #212529;
+    color: #fff;
+  }
+  .category-link.active .badge {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    color: #fff !important;
   }
 </style>
 

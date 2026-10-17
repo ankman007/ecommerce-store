@@ -1,0 +1,7 @@
+{% if product.stock <= 0 %}
+  <span class="badge text-bg-secondary">Out of stock</span>
+{% elif product.stock <= 5 %}
+  <span class="badge text-bg-warning">Only {{ product.stock }} left</span>
+{% else %}
+  <span class="badge text-bg-success">In stock</span>
+{% endif %}

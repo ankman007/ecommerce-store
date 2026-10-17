@@ -82,6 +82,7 @@
             </ul>
           </div>
         </li>
+        <li><a href="{% url 'orders' %}" class="flex items-center gap-2"><i class="bi bi-bag-check"></i> Orders</a></li>
         {% else %}
         <li><a href="{% url 'account_login' %}">Login</a></li>
         <li>
@@ -93,11 +94,9 @@
             <i class="bi bi-cart-fill fs-5"></i>
             Cart
             <span
-              id="cart-count"
-              class="badge rounded-pill bg-danger ml-auto"
-            >
-              {{ cart_count }}
-            </span>
+              id="cart-count-mobile"
+              class="badge rounded-pill bg-danger ml-auto{% if not cart_count %} d-none{% endif %}"
+            >{{ cart_count }}</span>
           </a>
         </li>
         <li>
@@ -187,14 +186,12 @@
       <li><a href="{% url 'account_signup' %}?next={% url 'profile-onboarding' %}">Signup</a></li>
       {% endif %}
       <li class="nav-item">
-        <a class="nav-link position-relative" href="{% url 'cart' %}">
+        <a class="nav-link position-relative" href="{% url 'cart' %}" aria-label="Cart">
           <i class="bi bi-cart-fill fs-5"></i>
           <span
             id="cart-count"
-            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-          >
-            {{ cart_count }}
-          </span>
+            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger{% if not cart_count %} d-none{% endif %}"
+          >{{ cart_count }}</span>
         </a>
       </li>
       <li class="nav-item">
@@ -234,30 +231,4 @@
     </ul>
   </nav>
 
-  <script>
-    document.body.addEventListener("htmx:afterSwap", function (event) {
-      if (
-        event.detail &&
-        event.detail.xhr &&
-        (event.detail.xhr.responseType === "" ||
-          event.detail.xhr.responseType === "text")
-      ) {
-        try {
-          const data = JSON.parse(event.detail.xhr.responseText);
-          if (data.cart_count_html) {
-            document.querySelector("#cart-count").outerHTML = data.cart_count_html;
-          }
-          if (data.button_html && event.target.closest("form")) {
-            const form = event.target.closest("form");
-            const targetDiv = form.querySelector('[id^="add-to-cart-btn-"]');
-            if (targetDiv) {
-              targetDiv.outerHTML = data.button_html;
-            }
-          }
-        } catch (e) {
-          console.error("Cart count update failed:", e);
-        }
-      }
-    });
-  </script>
 </header>

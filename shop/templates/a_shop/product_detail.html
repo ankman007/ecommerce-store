@@ -1,6 +1,15 @@
 {% extends 'layouts/blank.html' %}
 {% block content %}
 <div class="container my-5">
+  <nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb small mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none">Home</a></li>
+      {% if product.category %}
+      <li class="breadcrumb-item"><a href="{% url 'category' product.category.slug %}" class="text-decoration-none">{{ product.category.name }}</a></li>
+      {% endif %}
+      <li class="breadcrumb-item active" aria-current="page">{{ product.name }}</li>
+    </ol>
+  </nav>
   <div class="row gy-4">
     <div class="col-md-6">
       {% with images=product.images.all %}
@@ -61,59 +70,44 @@
       {% endwith %}
     </div>
 
-    <div class="col-md-6 d-flex flex-column justify-content-between">
-      <div>
-        <h2 class="mb-2 fw-semibold">{{ product.name }}</h2>
-        <p class="text-muted mb-3 small text-uppercase">{{ product.category }}</p>
-        <h3 class="text-success fw-bold mb-3">${{ product.price }}</h3>
+    <div class="col-md-6">
+      <div class="ps-md-3 d-flex flex-column h-100">
+        {% if product.category %}
+        <a href="{% url 'category' product.category.slug %}" class="text-muted small text-uppercase text-decoration-none mb-2" style="letter-spacing: .05em;">
+          {{ product.category.name }}
+        </a>
+        {% endif %}
+        <h1 class="fw-semibold mb-3" style="font-size: 2rem;">{{ product.name }}</h1>
 
-        <p class="mb-2">
-          <i class="bi bi-box-seam me-1"></i>
-          {% if product.stock == 0 %}
-          <span class="text-danger">Out of stock</span>
-          {% else %}
-          Stock left: {{ product.stock }}
-          {% endif %}
-        </p>
-        <p class="text-muted small mb-4">
-          <strong>Last updated:</strong> {{ product.updated_at|date:"M d, Y" }}
-        </p>
-
-        <p class="mb-4">{{ product.description }}</p>
-      </div>
-
-      <form
-        hx-post="{% url 'add_to_cart' product.id %}"
-        hx-target="#add-to-cart-btn-{{ product.id }}"
-        hx-swap="outerHTML"
-        class="mt-auto w-100">
-        {% csrf_token %}
-        <input type="hidden" name="quantity" value="1" />
-        <div id="add-to-cart-btn-{{ product.id }}">
-          {% if product.id in cart_product_ids %}
-            <button class="btn btn-success w-100" disabled>Added</button>
-          {% else %}
-            <button
-              type="submit"
-              class="btn btn-dark w-100"
-              {% if product.stock == 0 %} disabled aria-disabled="true" title="Out of stock" {% endif %}
-            >
-              Add to Cart
-            </button>
-          {% endif %}
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <span class="fw-bold text-dark" style="font-size: 1.75rem;">${{ product.price }}</span>
+          {% include 'a_shop/partials/stock_badge.html' %}
         </div>
-      </form>
+
+        {% if product.description %}
+        <p class="text-secondary mb-4" style="line-height: 1.7;">{{ product.description }}</p>
+        {% endif %}
+
+        <div class="border rounded-4 p-4 bg-light">
+          {% include 'a_shop/partials/add_to_cart_form.html' with show_quantity=True %}
+          <ul class="list-unstyled small text-muted mt-3 mb-0">
+            <li class="mb-1"><i class="bi bi-truck me-2"></i>Flat $5.00 shipping on every order</li>
+            <li class="mb-1"><i class="bi bi-shield-lock me-2"></i>Secure checkout powered by Stripe</li>
+            <li><i class="bi bi-envelope me-2"></i>Questions? <a href="{% url 'contact' %}">Contact us</a></li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="row mt-5 justify-content-center">
-    <div class="col-lg-9">
-      <h3>Browse Similar Products</h3>
+  <div class="row mt-5">
+    <div class="col-12">
+      <h3 class="fw-semibold">You might also like</h3>
       <div class="row g-4 mt-3">
         {% for product in similar_products %}
           {% include 'a_shop/partials/product_card.html' %}
         {% empty %}
-          <p>No similar products found.</p>
+          <p class="text-muted">No similar products yet. <a href="{% url 'home' %}">Browse all products</a>.</p>
         {% endfor %}
       </div>
     </div>

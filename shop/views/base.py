@@ -1,15 +1,15 @@
-from shop.models import Product, Category
+from shop.models import Category
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.contrib import messages
 from django.db.models import Count
 from shop.forms import ContactForm
 from django.http import HttpResponse
-from shop.utils import check_product_for_cart
+from shop.utils import check_product_for_cart, product_grid_queryset
 from shop.tasks import send_contact_email
 
 def home(request):
-    products = Product.objects.all()
+    products = product_grid_queryset()
     categories = Category.objects.annotate(product_count=Count('products'))
     cart_product_ids = check_product_for_cart(request)
 
@@ -27,6 +27,8 @@ def contact(request):
         if form.is_valid():
             
             subject = f"New contact us message from {form.cleaned_data['name']}"
+            if form.cleaned_data.get('subject'):
+                subject += f": {form.cleaned_data['subject']}"
             message = form.cleaned_data['message']
             sender_email = form.cleaned_data['email']
 

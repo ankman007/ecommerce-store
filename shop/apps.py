@@ -6,4 +6,6 @@ class AEcommerceConfig(AppConfig):
     name = 'shop'
     # Keep the original label so existing DB tables and migrations still match
     label = 'a_shop'
-    
+
+    def ready(self):
+        from . import signals  # noqa: F401  (connects receivers)

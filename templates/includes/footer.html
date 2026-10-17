@@ -33,14 +33,14 @@
       <div>
         <h6 class="uppercase font-semibold mb-2">Categories</h6>
         <ul class="space-y-1">
-          {% for cat in categories|slice:":4" %}
+          {% for cat in footer_categories %}
           <li>
             <a href="{% url 'category' cat.slug %}" class="hover:underline">
               {{ cat.name }}
             </a>
           </li>
           {% empty %}
-          <li>No categories found.</li>
+          <li class="text-gray-400">Coming soon</li>
           {% endfor %}
         </ul>
       </div>

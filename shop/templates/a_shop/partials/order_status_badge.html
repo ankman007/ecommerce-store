@@ -1,0 +1,7 @@
+{% if order.status == 'shipped' %}
+  <span class="badge text-bg-primary"><i class="bi bi-truck me-1"></i>Shipped</span>
+{% elif order.status == 'cancelled' %}
+  <span class="badge text-bg-secondary">Cancelled</span>
+{% else %}
+  <span class="badge text-bg-success"><i class="bi bi-check2 me-1"></i>Paid &middot; Preparing</span>
+{% endif %}

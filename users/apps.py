@@ -8,4 +8,4 @@ class AUsersConfig(AppConfig):
     label = 'a_users'
     
     def ready(self):
-        import users.signals
+        import users.signals  # noqa: F401  (registers signal receivers)

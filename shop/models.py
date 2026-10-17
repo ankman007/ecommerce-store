@@ -129,10 +129,26 @@ class Payment(models.Model):
     
 
 class Order(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_PAID = 'paid'
+    STATUS_SHIPPED = 'shipped'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_PAID, 'Paid'),
+        (STATUS_SHIPPED, 'Shipped'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    stripe_session_id = models.CharField(max_length=255, blank=True, null=True)
+    stripe_session_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    # `paid` is kept for backwards compatibility; `status` is the richer source of truth.
     paid = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    paid_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Order #{self.id} by {self.user}"
@@ -144,5 +160,9 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)  # price at the time of order
 
+    def subtotal(self):
+        return self.quantity * self.price
+
     def __str__(self):
-        return f"{self.quantity} x {self.product.name}"
+        name = self.product.name if self.product else "Deleted product"
+        return f"{self.quantity} x {name}"

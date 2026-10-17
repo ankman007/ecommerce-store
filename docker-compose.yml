@@ -43,7 +43,8 @@ services:
     build: .
     command: celery -A core flower --port=5555
     ports:
-      - "${FLOWER_PORT:-5560}:5555"
+      # Flower has no auth and shows task arguments, so only expose it on this machine
+      - "127.0.0.1:${FLOWER_PORT:-5560}:5555"
     env_file:
       - .env
     depends_on:

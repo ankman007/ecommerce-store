@@ -1,7 +1,5 @@
-<span
-  id="cart-count"
-  hx-swap-oob="true"
-  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
->
-  {{ cart_count }}
-</span>
+{# Out-of-band update for both header cart badges (desktop and mobile menus). #}
+<span id="cart-count" hx-swap-oob="true"
+  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger{% if not cart_count %} d-none{% endif %}">{{ cart_count }}</span>
+<span id="cart-count-mobile" hx-swap-oob="true"
+  class="badge rounded-pill bg-danger ml-auto{% if not cart_count %} d-none{% endif %}">{{ cart_count }}</span>

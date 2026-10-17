@@ -1,79 +1,210 @@
+from decimal import Decimal
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-from shop.models import Product, Cart, CartItem
-from loguru import logger
+from django.utils.html import escape
+from shop.models import Product, CartItem
+from shop.utils import get_user_cart
 
-def cart(request):
-    cart_items = []
+# Single source of truth for shipping: used by the cart page and by Stripe checkout.
+SHIPPING_COST = Decimal('5.00')
 
+
+def _session_qty(value):
+    """Guest cart values are ints; tolerate the legacy {quantity, price} shape."""
+    if isinstance(value, dict):
+        value = value.get('quantity', 0)
+    try:
+        return max(int(value), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_session_cart(request):
+    raw = request.session.get('cart', {})
+    if not isinstance(raw, dict):
+        raw = {}
+    cart = {str(pid): _session_qty(qty) for pid, qty in raw.items()}
+    return {pid: qty for pid, qty in cart.items() if qty > 0}
+
+
+def merge_session_cart_into_user_cart(request, user):
+    """Move a guest's session cart into the user's DB cart (capped by stock)."""
+    session_cart = get_session_cart(request)
+    if not session_cart:
+        return
+    cart = get_user_cart(user, create=True)
+    for product in Product.objects.filter(id__in=session_cart.keys()):
+        qty = session_cart[str(product.id)]
+        item, created = CartItem.objects.get_or_create(
+            cart=cart, product=product, defaults={'quantity': 0}
+        )
+        new_qty = min(item.quantity + qty, product.stock)
+        if new_qty <= 0:
+            item.delete()
+        else:
+            item.quantity = new_qty
+            item.save(update_fields=['quantity'])
+    request.session['cart'] = {}
+    request.session.modified = True
+
+
+def get_cart_items(request):
+    """Return a list of {'product', 'quantity', 'subtotal'} dicts for the current visitor."""
     if request.user.is_authenticated:
-        try:
-            cart = Cart.objects.get(user=request.user)
-            cart_items = cart.items.select_related('product').all()
-        except Cart.DoesNotExist:
-            cart_items = []
-        subtotal = sum(item.product.price * item.quantity for item in cart_items)
-    else:
-        session_cart = request.session.get('cart', {})
-        product_ids = session_cart.keys()
-        products = Product.objects.filter(id__in=product_ids)
-        quantity_map = {pid: qty for pid, qty in session_cart.items()}
-        cart_items = [
-            {'product': product, 'quantity': quantity_map[product.id]}
-            for product in products
+        cart = get_user_cart(request.user)
+        if not cart:
+            return []
+        return [
+            {'product': i.product, 'quantity': i.quantity, 'subtotal': i.subtotal()}
+            for i in cart.items.select_related('product')
         ]
-        subtotal = sum(item['product'].price * item['quantity'] for item in cart_items)
+    session_cart = get_session_cart(request)
+    products = Product.objects.filter(id__in=session_cart.keys())
+    return [
+        {
+            'product': p,
+            'quantity': session_cart[str(p.id)],
+            'subtotal': p.price * session_cart[str(p.id)],
+        }
+        for p in products
+    ]
 
-    shipping = 5.00
-    total = float(subtotal) + float(shipping)
 
-    return render(request, 'a_shop/cart.html', {
+def _cart_context(request):
+    cart_items = get_cart_items(request)
+    subtotal = sum((i['subtotal'] for i in cart_items), Decimal('0.00'))
+    shipping = SHIPPING_COST if cart_items else Decimal('0.00')
+    has_stock_issue = any(i['quantity'] > i['product'].stock for i in cart_items)
+    return {
         'cart_items': cart_items,
         'shipping_cost': shipping,
         'subtotal': subtotal,
-        'total': total,
-    })
+        'total': subtotal + shipping,
+        'has_stock_issue': has_stock_issue,
+    }
+
+
+def _cart_count(request):
+    return sum(i['quantity'] for i in get_cart_items(request))
+
+
+def cart(request):
+    return render(request, 'a_shop/cart.html', _cart_context(request))
+
+
+def _parse_quantity(raw, default=1):
+    try:
+        qty = int(raw if raw not in (None, '') else default)
+    except (TypeError, ValueError):
+        return None
+    return qty if qty > 0 else None
+
+
+def _toast(message):
+    return render_to_string("a_shop/partials/toast.html", {"message": message})
 
 
 def add_to_cart(request, product_id):
-    if request.method == 'POST':
-        quantity = int(request.POST.get('quantity', 1))
-        product = get_object_or_404(Product, id=product_id)
+    if request.method != 'POST':
+        return redirect('cart')
 
-        if request.user.is_authenticated:
-            cart, _ = Cart.objects.get_or_create(user=request.user)
-            item, created = CartItem.objects.get_or_create(
-                cart=cart, 
-                product=product,
-                defaults={'quantity': quantity}
-            )
+    product = get_object_or_404(Product, id=product_id)
+    quantity = _parse_quantity(request.POST.get('quantity', 1))
+    unavailable_btn = (
+        f'<div id="add-to-cart-btn-{escape(product.id)}">'
+        '<button class="btn btn-secondary w-100" disabled>{label}</button></div>'
+    )
 
-            if not created:
-                item.quantity += quantity
-                item.save()
-            total_items = sum(i.quantity for i in cart.items.all())
-        else:
-            cart_data = request.session.get('cart', {})
-            old_qty = cart_data.get(str(product_id), 0)
-            cart_data[str(product_id)] = old_qty + quantity
-            request.session['cart'] = cart_data
-            total_items = sum(cart_data.values())
+    if quantity is None:
+        return HttpResponse(_toast("Please choose a valid quantity."))
 
-        message = f"Product has been added to your cart (quantity: {quantity}). <a href='/cart/' class='text-white text-decoration-underline'>Click here to checkout</a>."        
-        toast_html = render_to_string("a_shop/partials/toast.html", {
-            "message": message,
-        })
-        button_html = render_to_string("a_shop/partials/add_to_cart_button.html", {
-            "product": product,
-            "added": True,
-        })
+    if product.stock <= 0:
         cart_count_html = render_to_string("a_shop/partials/cart_count.html", {
-            "cart_count": total_items
+            "cart_count": _cart_count(request)
         })
-        return HttpResponse(button_html + cart_count_html + toast_html)
+        return HttpResponse(
+            unavailable_btn.replace('{label}', 'Out of stock')
+            + cart_count_html
+            + _toast("Sorry, this product is out of stock.")
+        )
 
-    return redirect('cart')
+    if request.user.is_authenticated:
+        cart = get_user_cart(request.user, create=True)
+        item, _ = CartItem.objects.get_or_create(
+            cart=cart, product=product, defaults={'quantity': 0}
+        )
+        existing = item.quantity
+        new_qty = min(existing + quantity, product.stock)
+        item.quantity = new_qty
+        item.save(update_fields=['quantity'])
+    else:
+        cart_data = get_session_cart(request)
+        existing = cart_data.get(str(product_id), 0)
+        new_qty = min(existing + quantity, product.stock)
+        cart_data[str(product_id)] = new_qty
+        request.session['cart'] = cart_data
+        request.session.modified = True
+
+    added = new_qty - existing
+    total_items = _cart_count(request)
+
+    if added < quantity:
+        message = (
+            f"Only {product.stock} in stock; your cart now has {new_qty}. "
+            "<a href='/cart/' class='text-white text-decoration-underline'>View cart</a>."
+        )
+    else:
+        message = (
+            f"Added {quantity} &times; {escape(product.name)} to your cart. "
+            "<a href='/cart/' class='text-white text-decoration-underline'>View cart</a>"
+        )
+    button_html = render_to_string("a_shop/partials/add_to_cart_button.html", {
+        "product": product,
+        "added": True,
+    })
+    cart_count_html = render_to_string("a_shop/partials/cart_count.html", {
+        "cart_count": total_items
+    })
+    return HttpResponse(button_html + cart_count_html + _toast(message))
+
+
+def _render_cart_fragment(request):
+    context = _cart_context(request)
+    context['cart_count'] = sum(i['quantity'] for i in context['cart_items'])
+    context['oob_count'] = True
+    return render(request, "a_shop/partials/cart_items.html", context)
+
+
+def update_cart_item(request, product_id):
+    """Set the quantity of a cart line (HTMX); quantity is capped by stock, 0 removes."""
+    if request.method != "POST":
+        return redirect("cart")
+    product = get_object_or_404(Product, id=product_id)
+    try:
+        qty = int(request.POST.get('quantity', 1))
+    except (TypeError, ValueError):
+        qty = 1
+    qty = max(0, min(qty, product.stock))
+
+    if request.user.is_authenticated:
+        cart = get_user_cart(request.user)
+        if cart:
+            if qty == 0:
+                cart.items.filter(product=product).delete()
+            else:
+                cart.items.filter(product=product).update(quantity=qty)
+    else:
+        cart_data = get_session_cart(request)
+        if str(product_id) in cart_data:
+            if qty == 0:
+                del cart_data[str(product_id)]
+            else:
+                cart_data[str(product_id)] = qty
+            request.session['cart'] = cart_data
+            request.session.modified = True
+    return _render_cart_fragment(request)
 
 
 def remove_from_cart(request, product_id):
@@ -81,28 +212,14 @@ def remove_from_cart(request, product_id):
 
     if request.method == "POST":
         if request.user.is_authenticated:
-            try:
-                cart = Cart.objects.get(user=request.user)
-                cart_item = cart.items.get(product=product)
-                cart_item.delete()
-                cart_items = cart.items.select_related('product')
-            except (Cart.DoesNotExist, CartItem.DoesNotExist):
-                cart_items = []
+            cart = get_user_cart(request.user)
+            if cart:
+                cart.items.filter(product=product).delete()
         else:
-            cart = request.session.get('cart', {})
-            product_id_str = str(product_id)
-            if product_id_str in cart:
-                del cart[product_id_str]
-                request.session['cart'] = cart
-
-            cart_items = []
-            for pid, data in cart.items():
-                prod = Product.objects.filter(id=pid).first()
-                if prod:
-                    cart_items.append({'product': prod, 'quantity': data})
-
-
-        return render(request, "a_shop/partials/cart_items.html", {"cart_items": cart_items})
+            cart_data = get_session_cart(request)
+            cart_data.pop(str(product_id), None)
+            request.session['cart'] = cart_data
+            request.session.modified = True
+        return _render_cart_fragment(request)
 
     return redirect("cart")
-

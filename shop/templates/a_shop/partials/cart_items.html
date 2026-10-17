@@ -1,84 +1,122 @@
-<div id="cart-container">
+<div id="cart-container" class="row g-4 align-items-start">
+  {% csrf_token %}
   {% if cart_items %}
+  <div class="col-lg-8">
+    {% if has_stock_issue %}
+    <div class="alert alert-warning d-flex align-items-center gap-2 text-dark" role="alert">
+      <i class="bi bi-exclamation-triangle"></i>
+      Some items have less stock than you requested. Please adjust the highlighted quantities to continue.
+    </div>
+    {% endif %}
+
     {% for item in cart_items %}
-      {% with item.product as product %}
-        <div
-          class="card mb-4 cart-item px-4 py-4 hover-shadow"
-          style="background-color: #f9f9f9; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); border: none; border-radius: 1rem;"
-          data-price="{{ product.price }}"
-        >
-          <div class="row g-3 align-items-center">
-            <div class="col-1 d-flex justify-content-center">
-              <input type="checkbox" class="form-check-input item-checkbox mt-1" checked />
-            </div>
+      {% with product=item.product %}
+      <div class="cart-line rounded-4 p-3 mb-3 d-flex gap-3 align-items-center{% if item.quantity > product.stock %} border border-warning{% endif %}">
+        <a href="{% url 'product_detail' product.id %}" class="cart-line-image rounded-3 overflow-hidden d-flex align-items-center justify-content-center">
+          {% with image=product.images.all.0 %}
+            {% if image %}
+              <img src="{{ image.images.url }}" alt="{{ image.alt_text|default:product.name }}">
+            {% else %}
+              <i class="bi bi-image text-muted fs-3"></i>
+            {% endif %}
+          {% endwith %}
+        </a>
 
-            <div class="col-3">
-              <a href="{% url 'product_detail' product.id %}">
-                <img
-                  src="{{ product.images.first.images.url }}"
-                  alt="Product Image"
-                  class="img-fluid rounded-3 shadow-sm"
-                  style="height: 160px; object-fit: cover; width: 100%;"
-                />
-              </a>
-            </div>
-
-            <div class="col-5">
-              <a href="{% url 'product_detail' product.id %}" class="text-decoration-none text-dark">
-                <h5 class="fw-bold mb-1">{{ product.name }}</h5>
-              </a>
-              <p class="text-muted small mb-1">{{ product.category }}</p>
-              <span class="fw-bold text-success fs-5">
-                $<span class="item-price">{{ product.price }}</span>
-              </span>
-              <p class="mb-2">
-                <i class="bi bi-box-seam me-1"></i>
-                {% if product.stock == 0 %}
-                <span class="text-danger">Out of stock</span>
-                {% else %}
-                Stock left: {{ product.stock }}
-                {% endif %}
-              </p>
-            </div>
-
-            <div class="col-3">
-              <div
-                class="p-3 rounded-4 bg-light h-100 d-flex flex-column justify-content-between"
-              >
-                <div class="mb-2">
-                  <label class="form-label small fw-semibold text-dark d-block mb-1">Quantity</label>
-                  <input
-                    type="number"
-                    class="form-control form-control-sm quantity-input text-center"
-                    value="{{ item.quantity }}"
-                    min="1"
-                    max="{{ product.stock }}"
-                  />
-                </div>
-
-                <button
-                  hx-post="{% url 'remove_from_cart' product.id %}"
-                  hx-target="#cart-container"
-                  hx-swap="outerHTML"
-                  class="remove-btn w-100 btn btn-danger"
-                  hx-trigger="click"
-                  hx-include="[name=csrfmiddlewaretoken]"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          </div>
+        <div class="flex-grow-1" style="min-width: 0;">
+          <a href="{% url 'product_detail' product.id %}" class="text-decoration-none text-dark">
+            <h5 class="fw-semibold mb-1 text-truncate" style="font-size: 1.05rem;">{{ product.name }}</h5>
+          </a>
+          <p class="text-muted small mb-1">{{ product.category.name|default:"Uncategorized" }} &middot; ${{ product.price }} each</p>
+          <p class="small mb-0">
+            {% if product.stock == 0 %}
+              <span class="text-danger"><i class="bi bi-x-circle me-1"></i>Out of stock &mdash; please remove</span>
+            {% elif item.quantity > product.stock %}
+              <span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Only {{ product.stock }} left</span>
+            {% elif product.stock <= 5 %}
+              <span class="text-warning-emphasis">Only {{ product.stock }} left</span>
+            {% else %}
+              <span class="text-success"><i class="bi bi-check2 me-1"></i>In stock</span>
+            {% endif %}
+          </p>
         </div>
+
+        <div class="cart-line-controls d-flex flex-column align-items-end gap-2">
+          <div class="input-group input-group-sm qty-stepper">
+            <button class="btn btn-outline-secondary" aria-label="Decrease quantity"
+              hx-post="{% url 'update_cart_item' product.id %}" hx-vals='{"quantity": "{{ item.quantity|add:"-1" }}"}'
+              hx-target="#cart-container" hx-swap="outerHTML" hx-include="[name=csrfmiddlewaretoken]">&minus;</button>
+            <input id="qty-{{ product.id }}" type="number" name="quantity" class="form-control" aria-label="Quantity"
+              value="{{ item.quantity }}" min="0" max="{{ product.stock }}"
+              hx-post="{% url 'update_cart_item' product.id %}" hx-trigger="change"
+              hx-target="#cart-container" hx-swap="outerHTML" hx-include="[name=csrfmiddlewaretoken]">
+            <button class="btn btn-outline-secondary" aria-label="Increase quantity"
+              {% if item.quantity >= product.stock %}disabled{% endif %}
+              hx-post="{% url 'update_cart_item' product.id %}" hx-vals='{"quantity": "{{ item.quantity|add:"1" }}"}'
+              hx-target="#cart-container" hx-swap="outerHTML" hx-include="[name=csrfmiddlewaretoken]">+</button>
+          </div>
+          <span class="fw-semibold">${{ item.subtotal|floatformat:2 }}</span>
+          <a href="#" class="small text-danger text-decoration-none"
+            hx-post="{% url 'remove_from_cart' product.id %}" hx-target="#cart-container" hx-swap="outerHTML"
+            hx-include="[name=csrfmiddlewaretoken]"><i class="bi bi-trash3 me-1"></i>Remove</a>
+        </div>
+      </div>
       {% endwith %}
     {% endfor %}
+  </div>
+
+  <div class="col-lg-4" id="order-summary">
+    <div class="card border-0 rounded-4 p-4 product-card" style="transform: none;">
+      <h5 class="fw-semibold mb-3">Order summary</h5>
+      <div class="d-flex justify-content-between mb-2">
+        <span>Subtotal ({{ cart_count }} item{{ cart_count|pluralize }})</span>
+        <span>$<span id="subtotal">{{ subtotal|floatformat:2 }}</span></span>
+      </div>
+      <div class="d-flex justify-content-between mb-2">
+        <span>Shipping</span>
+        <span>$<span id="shipping">{{ shipping_cost|floatformat:2 }}</span></span>
+      </div>
+      <hr>
+      <div class="d-flex justify-content-between fw-bold fs-5 mb-4">
+        <span>Total</span>
+        <span>$<span id="total">{{ total|floatformat:2 }}</span></span>
+      </div>
+
+      {% if user.is_authenticated %}
+      <form id="checkout-form" action="{% url 'checkout' %}" method="POST">
+        {% csrf_token %}
+        <button id="checkout-button" type="submit"
+          class="w-100 d-inline-flex align-items-center justify-content-center gap-2{% if has_stock_issue %} opacity-50 cursor-not-allowed{% endif %}"
+          {% if has_stock_issue %}disabled{% endif %}>
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          <i class="bi bi-lock-fill"></i>
+          <span class="label">Proceed to checkout</span>
+        </button>
+      </form>
+      {% else %}
+      <a href="{% url 'account_login' %}?next={% url 'cart' %}" class="button w-100 text-center text-decoration-none">
+        <i class="bi bi-box-arrow-in-right me-1"></i> Log in to check out
+      </a>
+      <p class="small text-muted text-center mt-3 mb-0">
+        New here? <a href="{% url 'account_signup' %}?next={% url 'cart' %}">Create an account</a>.
+        Your cart is saved when you sign in.
+      </p>
+      {% endif %}
+
+      <p class="small text-muted mt-3 mb-0 d-flex gap-2">
+        <i class="bi bi-shield-lock"></i>
+        <span>You'll pay on Stripe's secure checkout page. We never see your card details.</span>
+      </p>
+    </div>
+  </div>
   {% else %}
-    <div class="alert alert-danger text-dark">Your cart is currently empty.</div>
+  <div class="col-12">
+    <div class="text-center bg-light rounded-4 py-5 px-3">
+      <i class="bi bi-cart3 fs-1 text-muted d-block mb-3"></i>
+      <h2 class="fw-semibold">Your cart is empty</h2>
+      <p class="text-muted">Browse the catalogue and add something you like.</p>
+      <a href="{% url 'home' %}" class="button text-decoration-none">Start shopping</a>
+    </div>
+  </div>
   {% endif %}
 </div>
-
-<style>
-  .hover-shadow:hover {
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12) !important;
-  }
-</style>
+{% if oob_count %}{% include 'a_shop/partials/cart_count.html' %}{% endif %}

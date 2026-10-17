@@ -1,86 +1,223 @@
-from django.views.decorators.csrf import csrf_exempt
-from django.shortcuts import redirect, render
-from django.urls import reverse
-from django.http import HttpResponseBadRequest
+import os
+from decimal import Decimal
+
 import stripe
 from django.conf import settings
-from django.template.loader import render_to_string
 from django.contrib import messages
-from shop.models import Order, OrderItem, Product, Cart
-from shop.tasks import create_order_task
+from django.db import transaction
+from django.db.models import F
+from django.http import HttpResponse, HttpResponseBadRequest
+from django.shortcuts import redirect
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from loguru import logger
+
+from shop.models import Order, OrderItem, Product, CartItem
+from shop.views.cart import SHIPPING_COST, get_user_cart
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
+def _field(obj, key):
+    """Read a field from a Stripe object or a plain dict."""
+    try:
+        return obj[key]
+    except (KeyError, TypeError, AttributeError):
+        return getattr(obj, key, None)
+
+
+def _to_cents(amount):
+    return int((Decimal(amount) * 100).quantize(Decimal('1')))
+
+
+def _toast(message):
+    return render_to_string("a_shop/partials/toast.html", {"message": message})
+
+
 def create_checkout_session(request):
-    if request.method == "POST":
-        item_names = request.POST.getlist("items_name")
-        item_prices = request.POST.getlist("items_price")
-        item_quantities = request.POST.getlist("items_quantity")
+    # GET (e.g. after "Login to Checkout") → send the user to their cart instead of a 400.
+    if request.method != "POST":
+        return redirect('cart')
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('account_login')}?next={reverse('cart')}")
 
-        if not item_names or not item_prices or not item_quantities:
-            return HttpResponseBadRequest("Missing form data")
+    cart = get_user_cart(request.user)
+    items = list(cart.items.select_related('product')) if cart else []
+    if not items:
+        messages.error(request, _toast("Your cart is empty."))
+        return redirect('cart')
 
-        line_items = []
-        cart = {}
+    # Everything below is built from the DB cart; client-posted fields are ignored.
+    for item in items:
+        if item.quantity < 1 or item.product.stock < item.quantity:
+            messages.error(request, _toast(
+                f"Sorry, only {item.product.stock} of {item.product.name} in stock. "
+                "Please update your cart."
+            ))
+            return redirect('cart')
 
-        for name, price, quantity in zip(item_names, item_prices, item_quantities):
-            try:
-                product = Product.objects.get(name=name)
-                line_items.append({
-                    'price_data': {
-                        'currency': 'usd',
-                        'unit_amount': int(float(price) * 100),
-                        'product_data': {
-                            'name': name,
-                        },
-                    },
-                    'quantity': int(quantity),
-                })
-                cart[str(product.id)] = {
-                    'quantity': int(quantity),
-                    'price': float(price),
-                }
-            except (Product.DoesNotExist, ValueError):
-                return HttpResponseBadRequest("Invalid product or data")
+    subtotal = sum((item.product.price * item.quantity for item in items), Decimal('0.00'))
+    shipping = SHIPPING_COST
+    with transaction.atomic():
+        order = Order.objects.create(
+            user=request.user,
+            status=Order.STATUS_PENDING,
+            paid=False,
+            shipping_cost=shipping,
+            total=subtotal + shipping,
+        )
+        OrderItem.objects.bulk_create([
+            OrderItem(order=order, product=item.product, quantity=item.quantity, price=item.product.price)
+            for item in items
+        ])
 
-        request.session['cart'] = cart
-        request.session.modified = True
+    line_items = [
+        {
+            'price_data': {
+                'currency': 'usd',
+                'unit_amount': _to_cents(item.product.price),
+                'product_data': {'name': item.product.name},
+            },
+            'quantity': item.quantity,
+        }
+        for item in items
+    ]
+    if shipping:
+        line_items.append({
+            'price_data': {
+                'currency': 'usd',
+                'unit_amount': _to_cents(shipping),
+                'product_data': {'name': 'Shipping'},
+            },
+            'quantity': 1,
+        })
 
+    try:
         checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
             line_items=line_items,
             mode='payment',
-            success_url=request.build_absolute_uri(reverse('success')),
+            client_reference_id=str(order.id),
+            metadata={'order_id': str(order.id)},
+            customer_email=request.user.email or None,
+            success_url=request.build_absolute_uri(reverse('success')) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=request.build_absolute_uri(reverse('cancel')),
         )
-        return redirect(checkout_session.url)
+    except stripe.StripeError:
+        logger.exception("Stripe checkout session creation failed for order {}", order.id)
+        order.status = Order.STATUS_CANCELLED
+        order.save(update_fields=['status'])
+        messages.error(request, _toast("Payment provider error. Please try again."))
+        return redirect('cart')
 
-    return HttpResponseBadRequest("Invalid request method")
+    order.stripe_session_id = _field(checkout_session, 'id')
+    order.save(update_fields=['stripe_session_id'])
+    return redirect(_field(checkout_session, 'url'))
+
+
+def fulfill_checkout_session(checkout_session):
+    """Idempotently mark the order for a paid Stripe Checkout Session as paid.
+
+    Returns (order, result) where result is one of:
+    'paid' (processed now), 'already_paid', 'unpaid', 'not_found', 'amount_mismatch'.
+    Shared by the success redirect and the webhook.
+    """
+    session_id = _field(checkout_session, 'id')
+    if not session_id:
+        return None, 'not_found'
+    if _field(checkout_session, 'payment_status') != 'paid':
+        return None, 'unpaid'
+
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(stripe_session_id=session_id).first()
+        if order is None:
+            return None, 'not_found'
+        if order.paid:
+            return order, 'already_paid'
+
+        amount_total = _field(checkout_session, 'amount_total')
+        if amount_total is not None and int(amount_total) != _to_cents(order.total):
+            logger.error("Amount mismatch for order {}: stripe={} expected={}",
+                         order.id, amount_total, _to_cents(order.total))
+            return order, 'amount_mismatch'
+
+        for item in order.items.all():
+            if not item.product_id:
+                continue
+            updated = Product.objects.filter(
+                pk=item.product_id, stock__gte=item.quantity
+            ).update(stock=F('stock') - item.quantity)
+            if not updated:
+                # Paid but oversold (concurrent purchase): never go negative; flag for review.
+                Product.objects.filter(pk=item.product_id).update(stock=0)
+                logger.warning("Order {} oversold product {}; needs manual review",
+                               order.id, item.product_id)
+
+        order.paid = True
+        order.status = Order.STATUS_PAID
+        order.paid_at = timezone.now()
+        order.save(update_fields=['paid', 'status', 'paid_at'])
+
+        if order.user_id:
+            product_ids = [i.product_id for i in order.items.all() if i.product_id]
+            CartItem.objects.filter(cart__user_id=order.user_id, product_id__in=product_ids).delete()
+
+    return order, 'paid'
 
 
 def success(request):
-    cart = request.session.get('cart', {})
+    session_id = request.GET.get('session_id')
+    if not session_id:
+        messages.error(request, _toast("Invalid payment confirmation."))
+        return redirect('home')
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('account_login')}?next={request.get_full_path()}")
 
-    if not cart:
-        messages.error(request, "🛒 Cart is empty or expired.")
+    order = Order.objects.filter(stripe_session_id=session_id, user=request.user).first()
+    if order is None:
+        messages.error(request, _toast("Order not found."))
         return redirect('home')
 
-    user_id = request.user.id if request.user.is_authenticated else None
-    create_order_task.delay(user_id, cart)
+    if not order.paid:
+        try:
+            checkout_session = stripe.checkout.Session.retrieve(session_id)
+        except stripe.StripeError:
+            logger.exception("Could not retrieve Stripe session {}", session_id)
+            messages.error(request, _toast("Could not verify payment. If you were charged, your order will be confirmed shortly."))
+            return redirect('orders')
+        _, result = fulfill_checkout_session(checkout_session)
+        if result not in ('paid', 'already_paid'):
+            messages.error(request, _toast("Payment has not been completed."))
+            return redirect('cart')
 
-    if 'cart' in request.session:
-        del request.session['cart']
-        request.session.modified = True
+    return redirect(f"{reverse('order_detail', args=[order.id])}?placed=1")
 
-    toast_message = "✅ Payment successful! Your order has been placed."
-    toast_html = render_to_string("a_shop/partials/toast.html", {"message": toast_message})
-    messages.success(request, toast_html)
-    return redirect('home')
+
+def _webhook_secret():
+    return getattr(settings, 'STRIPE_WEBHOOK_SECRET', None) or os.getenv('STRIPE_WEBHOOK_SECRET')
+
+
+@csrf_exempt
+@require_POST
+def stripe_webhook(request):
+    secret = _webhook_secret()
+    signature = request.META.get('HTTP_STRIPE_SIGNATURE')
+    if not secret or not signature:
+        return HttpResponseBadRequest("Webhook not configured or unsigned")
+    try:
+        event = stripe.Webhook.construct_event(request.body, signature, secret)
+    except (ValueError, stripe.SignatureVerificationError):
+        return HttpResponseBadRequest("Invalid signature")
+
+    event_type = _field(event, 'type')
+    if event_type in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
+        checkout_session = _field(_field(event, 'data'), 'object')
+        fulfill_checkout_session(checkout_session)
+    return HttpResponse(status=200)
 
 
 def cancel(request):
-    toast_message = "❌ Payment was canceled. <a href='/cart/' class='underline'>Return to cart</a> to try again."
-    toast_html = render_to_string("a_shop/partials/toast.html", {"message": toast_message})
-    messages.error(request, toast_html)
-    return redirect('home')
+    messages.info(request, _toast("Payment cancelled &mdash; you haven't been charged. Your cart is saved, so you can check out whenever you're ready."))
+    return redirect('cart')

@@ -1,1 +1,6 @@
-<button class="btn btn-success w-100" disabled>✔ Added</button>
+{# Replaces #add-to-cart-btn-<id> after a successful add; also used for products already in the cart. #}
+<div id="add-to-cart-btn-{{ product.id }}" class="d-flex gap-2">
+  <a href="{% url 'cart' %}" class="btn btn-success flex-grow-1 d-inline-flex align-items-center justify-content-center gap-2">
+    <i class="bi bi-check2-circle"></i> Added &middot; View cart
+  </a>
+</div>

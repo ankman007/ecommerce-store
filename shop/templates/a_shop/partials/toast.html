@@ -1,3 +1,8 @@
+{% comment %}
+  SECURITY: `message` is rendered with |safe so callers can include links.
+  Callers MUST only pass server-built HTML; escape any user/DB data first
+  (django.utils.html.format_html / escape) before passing it here.
+{% endcomment %}
 <div id="toast" class="custom-toast shadow">
   <div class="toast-content">
     <span class="toast-message">{{ message|safe }}</span>
