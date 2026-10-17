@@ -307,9 +307,10 @@ CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND')
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
-CELERY_TRACK_STARTED = True
-# Old-style name of worker_send_task_events (lets Flower show task events).
-CELERY_SEND_EVENTS = True
+# With namespace='CELERY' these must be the new-style names (CELERY_ + upper-cased setting name);
+# the old CELERY_TRACK_STARTED / CELERY_SEND_EVENTS spellings were silently ignored.
+CELERY_TASK_TRACK_STARTED = True
+CELERY_WORKER_SEND_TASK_EVENTS = True  # lets Flower show task events
 CELERY_TIMEZONE = 'UTC'
 # Keep Django's LOGGING (above) in charge of worker output instead of Celery replacing root handlers.
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
