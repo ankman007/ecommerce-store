@@ -29,6 +29,9 @@ services:
   celery:
     build: .
     command: celery -A core worker --loglevel=info --pool=solo
+    # Not a web server: skip the image's HTTP healthcheck
+    healthcheck:
+      disable: true
     volumes:
       - .:/app
     env_file:
@@ -43,6 +46,9 @@ services:
     build: .
     # Periodic tasks (see CELERY_BEAT_SCHEDULE); schedule state lives in /tmp, not the repo.
     command: celery -A core beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    # Not a web server: skip the image's HTTP healthcheck
+    healthcheck:
+      disable: true
     volumes:
       - .:/app
     env_file:
@@ -67,6 +73,9 @@ services:
   flower:
     build: .
     command: celery -A core flower --port=5555
+    # Not a web server: skip the image's HTTP healthcheck
+    healthcheck:
+      disable: true
     ports:
       # Flower has no auth and shows task arguments, so only expose it on this machine
       - "127.0.0.1:${FLOWER_PORT:-5560}:5555"
