@@ -74,8 +74,6 @@ INSTALLED_APPS = [
     'shop',
 ]
 
-INSTALLED_APPS += ['ckeditor']
-
 SITE_ID = 1
 
 MIDDLEWARE = [

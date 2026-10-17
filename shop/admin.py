@@ -8,7 +8,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
-from ckeditor.widgets import CKEditorWidget
 from .models import (
     Product,
     ProductImage,
@@ -32,7 +31,7 @@ class ProductAdminForm(forms.ModelForm):
         model = Product
         fields = '__all__'
         widgets = {
-            'description': CKEditorWidget(),
+            'description': forms.Textarea(attrs={'rows': 8}),
         }
 
 

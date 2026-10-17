@@ -2,10 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.text import slugify
 from decimal import Decimal
-from ckeditor.fields import RichTextField
 from PIL import Image
 from io import BytesIO
-import re
 from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
@@ -35,7 +33,7 @@ class Category(models.Model):
 class Product(models.Model):
     id = models.CharField(primary_key=True, max_length=22, unique=True, default=generate_product_id, editable=False)
     name = models.CharField(max_length=200)
-    description = RichTextField(blank=True)
+    description = models.TextField(blank=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='products')
     price = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
@@ -46,7 +44,9 @@ class Product(models.Model):
         return reverse('product_detail', args=[self.id])
 
     def save(self, *args, **kwargs):
-        self.description = re.sub(r'&nbsp;|<p>|</p>', ' ', self.description).strip()
+        # Plain text: normalise line endings and trim surrounding whitespace.
+        # Templates escape it and render line breaks with |linebreaksbr.
+        self.description = (self.description or '').replace('\r\n', '\n').replace('\r', '\n').strip()
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -60,6 +60,7 @@ Audit and hardening pass over the Django eCommerce store, done by five parallel 
 - **XSS:** every caller of the toast partial, which uses `|safe`, was audited. None passes user input today, and a warning comment was added to the template.
 - Flower (no auth, shows task arguments) is bound to `127.0.0.1` only.
 - A superuser can't delete their own account from the profile page.
+- **CKEditor removed:** `django-ckeditor` (bundled the unsupported CKEditor 4) is gone. `Product.description` is a plain `TextField` edited in a normal admin textarea and rendered escaped with `|linebreaksbr`. Migration `0007` converts existing HTML descriptions to plain text, keeping paragraphs and line breaks.
 
 ### Backend robustness
 - **Profiles:** a user without a profile no longer gets a 500 on `/profile/` or `/@username/`, and username lookups are case-insensitive.
@@ -144,7 +145,7 @@ All are optional and have safe defaults; see `.env.example`.
 
 | Priority | Issue | Suggested fix |
 |---|---|---|
-| High | CKEditor 4 is unsupported and has known security issues (admin-only) | Move to `django-ckeditor-5` or a plain text field with sanitising |
+| ~~High~~ | ~~CKEditor 4 is unsupported and has known security issues~~ | Resolved: `django-ckeditor` removed; descriptions are escaped plain text (migration `0007` converts old HTML) |
 | Low | No coupon or discount system (none existed) | Build only if needed |
 | High | The production Stripe webhook endpoint isn't registered yet (local forwarding works) | In the Stripe dashboard add `https://<domain>/stripe/webhook/` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`; put its signing secret in the server's `STRIPE_WEBHOOK_SECRET` |
 | Low | `Payment` model is unused (payment intents are now stored on `Order`) | Remove it |

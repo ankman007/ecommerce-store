@@ -108,7 +108,7 @@
         </div>
 
         {% if product.description %}
-        <p class="text-secondary mb-4" style="line-height: 1.7;">{{ product.description }}</p>
+        <p class="text-secondary mb-4" style="line-height: 1.7;">{{ product.description|linebreaksbr }}</p>
         {% endif %}
 
         <div class="border rounded-4 p-4 bg-light">

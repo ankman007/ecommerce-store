@@ -1,5 +1,7 @@
+import importlib
 from decimal import Decimal
 
+from django.apps import apps as django_apps
 from django.test import TestCase
 from PIL import Image
 
@@ -37,11 +39,66 @@ class ProductModelTests(TestCase):
         self.assertNotEqual(p1.id, p2.id)
         self.assertEqual(Product.objects.count(), 2)
 
-    def test_description_html_paragraphs_stripped(self):
-        p = make_product(description='<p>Hello&nbsp;world</p>')
-        self.assertNotIn('<p>', p.description)
-        self.assertNotIn('&nbsp;', p.description)
-        self.assertIn('Hello', p.description)
+    def test_description_plain_text_normalised(self):
+        # Descriptions are plain text now (CKEditor removed): save() trims surrounding
+        # whitespace and normalises Windows/old-Mac newlines, and keeps everything else.
+        p = make_product(description='  First line\r\nSecond line\rThird\n\n')
+        self.assertEqual(p.description, 'First line\nSecond line\nThird')
+        p.refresh_from_db()
+        self.assertEqual(p.description, 'First line\nSecond line\nThird')
+
+    def test_description_text_kept_verbatim(self):
+        p = make_product(description='Size < 5 & AT&T <b>not markup</b>')
+        self.assertEqual(p.description, 'Size < 5 & AT&T <b>not markup</b>')
+
+    def test_description_rendered_escaped_with_line_breaks(self):
+        p = make_product(description='Line one\nLine <b>two</b>')
+        response = self.client.get(p.get_absolute_url())
+        self.assertContains(response, 'Line one<br>Line &lt;b&gt;two&lt;/b&gt;')
+        self.assertNotContains(response, 'Line <b>two</b>')
+
+
+class DescriptionDataMigrationTests(TestCase):
+    """0007 converts HTML saved by CKEditor into plain text."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        module = importlib.import_module('shop.migrations.0007_product_description_plain_text')
+        cls.convert = staticmethod(module.html_to_plain_text)
+
+    def test_paragraphs_become_blank_line_separated(self):
+        self.assertEqual(self.convert('<p>Hello&nbsp;world</p>\r\n\r\n<p>Second</p>'), 'Hello world\n\nSecond')
+
+    def test_br_and_inline_tags(self):
+        self.assertEqual(self.convert('<p><strong>Bold</strong> text<br />\r\nnext line</p>'), 'Bold text\nnext line')
+
+    def test_entities_unescaped(self):
+        self.assertEqual(self.convert('Fish &amp; chips &lt;3 &quot;hot&quot;'), 'Fish & chips <3 "hot"')
+
+    def test_rows_saved_by_old_save(self):
+        # The old save() replaced <p>/</p>/&nbsp; with spaces; newlines carry the paragraphs.
+        self.assertEqual(self.convert(' One <em>a</em> \r\n\r\n Two '), 'One a\n\nTwo')
+
+    def test_lists_and_excess_blank_lines(self):
+        value = '<ul>\n\t<li>Red</li>\n\t<li>Blue</li>\n</ul>\n\n\n\n<p>End</p>'
+        self.assertEqual(self.convert(value), 'Red\nBlue\n\nEnd')
+
+    def test_plain_text_left_alone(self):
+        self.assertEqual(self.convert('  AT&T, size < 5\n\n\nok  '), 'AT&T, size < 5\n\n\nok')
+        self.assertEqual(self.convert(''), '')
+        self.assertEqual(self.convert(None), '')
+
+    def test_migration_rewrites_existing_rows(self):
+        module = importlib.import_module('shop.migrations.0007_product_description_plain_text')
+        html_product = make_product(name='Html', description='x')
+        plain_product = make_product(name='Plain', description='Already plain')
+        Product.objects.filter(pk=html_product.pk).update(description='<p>A&nbsp;<b>B</b></p>\n<p>C</p>')
+        module.convert_descriptions(django_apps, None)
+        html_product.refresh_from_db()
+        plain_product.refresh_from_db()
+        self.assertEqual(html_product.description, 'A B\n\nC')
+        self.assertEqual(plain_product.description, 'Already plain')
 
     def test_str_without_category(self):
         self.assertIn('Uncategorized', str(make_product('Lonely')))
