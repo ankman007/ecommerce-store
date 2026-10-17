@@ -67,7 +67,7 @@ class SessionCreationTests(CheckoutBase):
         self.assertAlmostEqual(expires_at, expected, delta=5)
 
 
-@override_settings(RECIPIENT_EMAIL='shop@example.com', EMAIL_HOST_USER='noreply@example.com')
+@override_settings(RECIPIENT_EMAIL='shop@example.com', DEFAULT_FROM_EMAIL='noreply@example.com')
 class ReviewFlowTests(CheckoutBase):
     def setUp(self):
         super().setUp()

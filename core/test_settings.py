@@ -3,6 +3,8 @@
 import os
 
 os.environ.setdefault('SECRET_KEY', 'test-secret-key')
+# Keep test output clean; run with LOG_LEVEL=DEBUG to see application logs while debugging a test.
+os.environ.setdefault('LOG_LEVEL', 'CRITICAL')
 
 from .settings import *  # noqa: E402,F401,F403
 
@@ -20,7 +22,8 @@ DATABASES = {
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 
-EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+# In-memory mailer; the test runner also forces every MAILERS alias to locmem so mail.outbox works.
+MAILERS = {'default': {'BACKEND': 'django.core.mail.backends.locmem.EmailBackend'}}
 PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 STRIPE_SECRET_KEY = 'sk_test_dummy'

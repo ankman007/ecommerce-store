@@ -13,9 +13,8 @@ def send_contact_email(sender_email, subject, message):
     send_mail(
         subject,
         full_message,
-        settings.EMAIL_HOST_USER,
+        settings.DEFAULT_FROM_EMAIL,
         [settings.RECIPIENT_EMAIL],
-        fail_silently=False,
     )
 
 
@@ -34,9 +33,12 @@ def notify_order_needs_review(order_id, reason):
         "or refund it (action: 'Refund via Stripe')."
     )
     if recipient:
-        send_mail(subject, body, settings.EMAIL_HOST_USER, [recipient], fail_silently=False)
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [recipient])
     else:
-        mail_admins(subject, body, fail_silently=True)
+        try:
+            mail_admins(subject, body)
+        except Exception:
+            logger.exception("Could not email admins about order {}", order_id)
 
 
 @shared_task

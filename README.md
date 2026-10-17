@@ -72,6 +72,12 @@ Paid orders that need attention (stock ran out after payment, amount mismatch) g
 
 In production, add the endpoint `https://<your-domain>/stripe/webhook/` in the Stripe dashboard for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`, and use its signing secret.
 
+### Email and logging
+
+Email uses Django's `MAILERS` setting, built from the same `.env` variables as before (`EMAIL_BACKEND`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `RECIPIENT_EMAIL`; optional `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_TIMEOUT`, `DEFAULT_FROM_EMAIL`). Mail is sent from `DEFAULT_FROM_EMAIL`, which defaults to `EMAIL_HOST_USER`.
+
+All logs go to the console (`docker compose logs`). Set `LOG_LEVEL` (default `INFO`) to change the level. Messages logged with loguru are passed to Python's standard `logging`, so they use the same format and level. Tests run with `LOG_LEVEL=CRITICAL` unless you set it yourself.
+
 ### Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:
