@@ -42,7 +42,8 @@ class GuestCartTests(CartTestMixin, TestCase):
         body = resp.content.decode()
         self.assertIn('id="cart-count"', body)
         self.assertIn('hx-swap-oob', body)
-        self.assertIn('id="toast"', body)
+        self.assertIn('class="custom-toast', body)
+        self.assertIn('hx-swap-oob="beforeend:#toast-region"', body)
         self.assertIn('Added', body)
         self.assertIn('/cart/', body)
 

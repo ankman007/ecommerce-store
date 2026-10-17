@@ -102,8 +102,8 @@ def _parse_quantity(raw, default=1):
     return qty if qty > 0 else None
 
 
-def _toast(message):
-    return render_to_string("a_shop/partials/toast.html", {"message": message})
+def _toast(message, level=None):
+    return render_to_string("a_shop/partials/toast.html", {"message": message, "level": level})
 
 
 def add_to_cart(request, product_id):
@@ -118,7 +118,10 @@ def add_to_cart(request, product_id):
     )
 
     if quantity is None:
-        return HttpResponse(_toast("Please choose a valid quantity."))
+        # Only show the toast; keep the existing button in place.
+        response = HttpResponse(_toast("Please choose a valid quantity.", level="warning"))
+        response['HX-Reswap'] = 'none'
+        return response
 
     if product.stock <= 0:
         cart_count_html = render_to_string("a_shop/partials/cart_count.html", {
@@ -127,7 +130,7 @@ def add_to_cart(request, product_id):
         return HttpResponse(
             unavailable_btn.replace('{label}', 'Out of stock')
             + cart_count_html
-            + _toast("Sorry, this product is out of stock.")
+            + _toast("Sorry, this product is out of stock.", level="warning")
         )
 
     if request.user.is_authenticated:

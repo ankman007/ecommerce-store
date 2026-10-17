@@ -2,82 +2,14 @@
   SECURITY: `message` is rendered with |safe so callers can include links.
   Callers MUST only pass server-built HTML; escape any user/DB data first
   (django.utils.html.format_html / escape) before passing it here.
+
+  The wrapper is an HTMX out-of-band swap: in HTMX responses the toast is appended to
+  #toast-region (in base.html) instead of being inserted next to the element that was swapped.
+  On normal page renders the wrapper is just a plain div inside #toast-region.
 {% endcomment %}
-<div id="toast" class="custom-toast shadow">
-  <div class="toast-content">
+<div hx-swap-oob="beforeend:#toast-region">
+  <div class="custom-toast{% if level %} toast-{{ level }}{% endif %}" role="status">
     <span class="toast-message">{{ message|safe }}</span>
-    <button
-      class="toast-close"
-      onclick="document.getElementById('toast')?.remove()"
-    >
-      ×
-    </button>
+    <button class="toast-close" aria-label="Dismiss" onclick="this.closest('.custom-toast').remove()">&times;</button>
   </div>
 </div>
-
-<script>
-  setTimeout(() => {
-    const toast = document.currentScript?.previousElementSibling;
-    if (toast) {
-      toast.classList.add("fade-out");
-      setTimeout(() => toast.remove(), 400);
-    }
-  }, 6000);
-</script>
-
-<style>
-  .custom-toast {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    background-color: #198754;
-    color: white;
-    border-radius: 10px;
-    padding: 1rem 1.5rem;
-    z-index: 1055;
-    max-width: 400px;
-    animation: fadeInUp 0.4s ease-in-out;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  }
-
-  .custom-toast.fade-out {
-    opacity: 0;
-    transition: opacity 0.4s ease-out;
-  }
-
-  .toast-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-  }
-
-  .toast-message {
-    flex: 1;
-    padding-right: 1rem;
-    font-size: 0.95rem;
-  }
-
-  .toast-close {
-    background: transparent;
-    border: none;
-    color: white;
-    font-size: 1.3rem;
-    cursor: pointer;
-    line-height: 1;
-  }
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-</style>

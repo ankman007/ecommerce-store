@@ -172,6 +172,58 @@
       .product-card:hover .product-card-image img {
         transform: scale(1.03);
       }
+      #toast-region {
+        position: fixed;
+        right: 2rem;
+        bottom: 2rem;
+        z-index: 1080;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.75rem;
+        max-width: min(400px, calc(100vw - 2rem));
+        pointer-events: none;
+      }
+      @media (max-width: 575.98px) {
+        #toast-region { left: 1rem; right: 1rem; bottom: 1rem; max-width: none; }
+      }
+      .custom-toast {
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        width: 100%;
+        background-color: #198754;
+        color: #fff;
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        animation: toast-in 0.3s ease-out;
+        transition: opacity 0.4s ease-out;
+      }
+      .custom-toast.fade-out { opacity: 0; }
+      .toast-level-error .custom-toast, .custom-toast.toast-error { background-color: #dc3545; }
+      .toast-level-warning .custom-toast, .custom-toast.toast-warning { background-color: #b45309; }
+      .toast-level-info .custom-toast, .custom-toast.toast-info { background-color: #1f2937; }
+      .custom-toast a { color: #fff; text-decoration: underline; }
+      .toast-message { flex: 1; font-size: 0.95rem; }
+      .toast-close {
+        background: transparent;
+        border: none;
+        color: #fff;
+        font-size: 1.4rem;
+        line-height: 1;
+        padding: 0;
+        box-shadow: none;
+        cursor: pointer;
+      }
+      .toast-close:hover { background: transparent; opacity: 0.8; }
+      @keyframes toast-in {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      /* Narrow product cards: the check icon already says "added" */
+      .product-card .added-prefix { display: none; }
       .htmx-request.btn,
       .htmx-request .btn {
         opacity: 0.7;
@@ -188,13 +240,18 @@
     {% block layout %} {% endblock %} {% block javascript %}{% endblock %}
   </main>
     {% include 'includes/footer.html' %}
-    {% if messages %}
+    {# All toasts live here, directly under <body>, so no transformed ancestor can move them. #}
+    <div id="toast-region" aria-live="polite">
       {% for message in messages %}
-          <div class="toast-container">
-          {{ message }}
+        <div class="toast-level-{{ message.level_tag }}">
+          {% if 'custom-toast' in message.message %}
+            {{ message }}
+          {% else %}
+            {% include 'a_shop/partials/toast.html' with message=message.message|force_escape %}
+          {% endif %}
         </div>
       {% endfor %}
-    {% endif %}
+    </div>
     <button
       id="backToTopBtn"
       class="fixed bottom-8 right-8 hidden w-12 h-12 flex items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-700 transition"
@@ -217,5 +274,19 @@
     backToTopBtn.addEventListener("click", () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
+
+    // Auto-dismiss toasts, whether rendered with the page or added later by HTMX.
+    function initToasts() {
+      document.querySelectorAll("#toast-region .custom-toast:not([data-ready])").forEach((toast) => {
+        toast.dataset.ready = "1";
+        setTimeout(() => {
+          toast.classList.add("fade-out");
+          setTimeout(() => toast.remove(), 400);
+        }, 6000);
+      });
+    }
+    initToasts();
+    document.addEventListener("htmx:oobAfterSwap", initToasts);
+    document.addEventListener("htmx:afterSettle", initToasts);
   </script>
 </html>
