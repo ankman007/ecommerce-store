@@ -1,4 +1,6 @@
 {% extends 'layouts/blank.html' %}
+{% block title %}Your cart | A One Albany Wholesale{% endblock %}
+{% block meta_extra %}<meta name="robots" content="noindex, nofollow">{% endblock %}
 {% block content %}
 <div class="container my-5">
   <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-4">
@@ -25,14 +27,14 @@
   #checkout-button.loading .spinner-border { display: inline-block; }
 </style>
 <script>
-  // Prevent double submission (which would open two Stripe sessions) and show progress.
+  // Show progress while the shipping-details page loads.
   document.body.addEventListener("submit", function (event) {
     const form = event.target.closest("#checkout-form");
     if (!form) return;
     const button = form.querySelector("#checkout-button");
     button.disabled = true;
     button.classList.add("loading");
-    button.querySelector(".label").textContent = "Redirecting to secure checkout…";
+    button.querySelector(".label").textContent = "Loading…";
   });
 </script>
 {% endblock %}

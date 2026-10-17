@@ -1,25 +1,15 @@
-from shop.models import Category
+from shop.models import Product
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
 from django.contrib import messages
-from django.db.models import Count
 from shop.forms import ContactForm
 from django.http import HttpResponse
-from shop.utils import check_product_for_cart, product_grid_queryset
 from shop.tasks import send_contact_email
+from shop.views.listing import render_product_listing
 
 
 def home(request):
-    products = product_grid_queryset()
-    categories = Category.objects.annotate(product_count=Count('products'))
-    cart_product_ids = check_product_for_cart(request)
-
-    context = {
-        'products': products,
-        'categories': categories,
-        'cart_product_ids': cart_product_ids,
-    }
-    return render(request, 'a_shop/home.html', context)
+    return render_product_listing(request, Product.objects.all())
 
 
 def contact(request):

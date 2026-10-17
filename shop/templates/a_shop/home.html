@@ -1,4 +1,8 @@
 {% extends 'layouts/blank.html' %}
+{% block title %}{% if selected_category %}{{ selected_category }} | {% elif query %}Search: {{ query }} | {% endif %}{% if page_obj.number > 1 %}Page {{ page_obj.number }} | {% endif %}A One Albany Wholesale{% endblock %}
+{% block meta_description %}{% if selected_category %}Shop {{ selected_category }} at A One Albany Wholesale: wholesale prices, flat-rate shipping and secure checkout.{% else %}{{ block.super }}{% endif %}{% endblock %}
+{% block meta_extra %}{% if query or filters_active %}<meta name="robots" content="noindex, follow">{% endif %}{% endblock %}
+{% block canonical_url %}{{ block.super }}{% if page_obj.number > 1 %}?page={{ page_obj.number }}{% endif %}{% endblock %}
 {% block content %}
 
 <div class="container-fluid px-3 px-md-4 px-lg-5 my-5">
@@ -17,10 +21,44 @@
             <h1 class="mb-0">All Products</h1>
           {% endif %}
         </div>
-        {% if products %}
-          <span class="text-muted small">{{ products|length }} product{{ products|length|pluralize }}</span>
+        {% if paginator.count %}
+          <span class="text-muted small" id="result-count">
+            {% if is_paginated %}{{ page_obj.start_index }}&ndash;{{ page_obj.end_index }} of {% endif %}{{ paginator.count }} product{{ paginator.count|pluralize }}
+          </span>
         {% endif %}
       </div>
+
+      {% if paginator.count or filters_active %}
+      <form method="get" action="{{ request.path }}" class="catalog-toolbar d-flex flex-wrap align-items-end gap-2 mb-4" role="search" aria-label="Sort and filter products">
+        {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+        <div>
+          <label for="sort-select" class="small text-muted">Sort by</label>
+          <select id="sort-select" name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for value, label in sort_choices %}
+              <option value="{{ value }}"{% if filters.sort == value %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="min-price" class="small text-muted">Min price ($)</label>
+          <input id="min-price" type="number" name="min_price" min="0" step="0.01" inputmode="decimal"
+            class="form-control form-control-sm" value="{{ filters.min_price|default_if_none:'' }}" placeholder="Min">
+        </div>
+        <div>
+          <label for="max-price" class="small text-muted">Max price ($)</label>
+          <input id="max-price" type="number" name="max_price" min="0" step="0.01" inputmode="decimal"
+            class="form-control form-control-sm" value="{{ filters.max_price|default_if_none:'' }}" placeholder="Max">
+        </div>
+        <div class="form-check mb-1">
+          <input id="in-stock" type="checkbox" name="in_stock" value="1" class="form-check-input"{% if filters.in_stock %} checked{% endif %}>
+          <label for="in-stock" class="form-check-label small">In stock only</label>
+        </div>
+        <button type="submit" class="btn btn-dark btn-sm px-3">Apply</button>
+        {% if filters_active %}
+          <a href="{{ request.path }}{% if query %}?q={{ query|urlencode }}{% endif %}" class="btn btn-link btn-sm">Clear filters</a>
+        {% endif %}
+      </form>
+      {% endif %}
 
       {% if products %}
       <div class="row g-4">
@@ -28,10 +66,39 @@
         {% include 'a_shop/partials/product_card.html' %}
         {% endfor %}
       </div>
+
+      {% if is_paginated %}
+      <nav aria-label="Product pages" class="mt-5">
+        <ul class="pagination justify-content-center flex-wrap">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.previous_page_number %}" rel="prev">&laquo; Previous</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">&laquo; Previous</span></li>
+          {% endif %}
+          {% for number in page_obj.paginator.get_elided_page_range %}
+            {% if number == page_obj.number %}
+              <li class="page-item active" aria-current="page"><span class="page-link">{{ number }}</span></li>
+            {% elif number == page_obj.paginator.ELLIPSIS %}
+              <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% else %}
+              <li class="page-item"><a class="page-link" href="{% querystring page=number %}">{{ number }}</a></li>
+            {% endif %}
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.next_page_number %}" rel="next">Next &raquo;</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Next &raquo;</span></li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
       {% else %}
       <div class="text-center bg-light rounded-4 py-5 px-3">
         <i class="bi bi-search fs-1 text-muted d-block mb-3"></i>
-        {% if query %}
+        {% if filters_active %}
+          <h2 class="fw-semibold">No products match these filters</h2>
+          <p class="text-muted">Try widening the price range or including out-of-stock items.</p>
+        {% elif query %}
           <h2 class="fw-semibold">No products match &ldquo;{{ query }}&rdquo;</h2>
           <p class="text-muted">Check the spelling or try a more general term.</p>
         {% elif selected_category %}
@@ -93,6 +160,11 @@
     background-color: rgba(255, 255, 255, 0.2) !important;
     color: #fff !important;
   }
+  .catalog-toolbar label { display: block !important; margin-bottom: 0.15rem; }
+  .catalog-toolbar .form-check-label { display: inline-block !important; margin: 0; }
+  .catalog-toolbar input[type="number"] { width: 7rem; padding: 0.3rem 0.6rem; background: #fff; }
+  .catalog-toolbar input[type="checkbox"] { width: 1em; padding: 0; }
+  .catalog-toolbar .btn { box-shadow: none; }
 </style>
 
 {% endblock %}

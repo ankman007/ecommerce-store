@@ -85,7 +85,8 @@ class ReviewFlowTests(CheckoutBase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.stripe_payment_intent, 'pi_test_1')
         self.assertEqual(self.order.status, Order.STATUS_PAID)
-        self.assertEqual(len(mail.outbox), 0)
+        # No review email to the shop; only the customer's order confirmation (added in 0006).
+        self.assertEqual([m.to for m in mail.outbox], [['alice@example.com']])
 
     def test_oversold_order_is_flagged_and_shop_emailed(self):
         self.product.stock = 1  # sold elsewhere while the customer was paying for 2
@@ -97,9 +98,11 @@ class ReviewFlowTests(CheckoutBase):
         self.assertEqual(self.order.status, Order.STATUS_NEEDS_REVIEW)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 0)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn(f'#{self.order.id}', mail.outbox[0].subject)
-        self.assertEqual(mail.outbox[0].to, ['shop@example.com'])
+        # The shop is told to review it; the customer still gets their order confirmation.
+        shop_mail = [m for m in mail.outbox if m.to == ['shop@example.com']]
+        self.assertEqual(len(shop_mail), 1)
+        self.assertIn(f'#{self.order.id}', shop_mail[0].subject)
+        self.assertEqual(len(mail.outbox), 2)
 
     def test_amount_mismatch_is_flagged_but_not_paid(self):
         _, result = self.fulfil(amount=1)

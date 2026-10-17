@@ -1,7 +1,8 @@
 from django.shortcuts import render, get_object_or_404
-from shop.models import Product, Category
-from django.db.models import Count, Q
+from shop.models import Product
+from django.db.models import Q
 from shop.utils import check_product_for_cart, product_grid_queryset
+from shop.views.listing import render_product_listing
 
 SIMILAR_PRODUCTS_LIMIT = 8
 
@@ -28,21 +29,9 @@ def product_detail(request, id):
 
 
 def product_search(request):
-    query = request.GET.get('q', '')
-    results = (
-        product_grid_queryset(Product.objects.filter(Q(name__icontains=query) | Q(description__icontains=query)))
-        if query
-        else []
-    )
-    categories = Category.objects.annotate(product_count=Count('products'))
-    cart_product_ids = check_product_for_cart(request)
-    return render(
-        request,
-        'a_shop/home.html',
-        {
-            'query': query,
-            'products': results,
-            'categories': categories,
-            'cart_product_ids': cart_product_ids,
-        },
-    )
+    query = request.GET.get('q', '').strip()[:200]
+    if query:
+        results = Product.objects.filter(Q(name__icontains=query) | Q(description__icontains=query))
+    else:
+        results = Product.objects.none()
+    return render_product_listing(request, results, {'query': query})

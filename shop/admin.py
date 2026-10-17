@@ -1,6 +1,13 @@
+from functools import partial
+
 import stripe
 from django.contrib import admin, messages
 from django import forms
+from django.db import transaction
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from ckeditor.widgets import CKEditorWidget
 from .models import (
     Product,
@@ -107,16 +114,107 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'created_at', 'status', 'total', 'paid_at')
-    list_filter = ('status', 'paid', 'created_at')
-    search_fields = ('id', 'user__username', 'user__email', 'stripe_session_id', 'stripe_payment_intent')
+    list_display = ('id', 'customer', 'created_at', 'status', 'total', 'paid_at', 'shipped_at')
+    list_filter = ('status', 'paid', 'created_at', 'shipped_at')
+    search_fields = (
+        'id',
+        'user__username',
+        'user__email',
+        'full_name',
+        'phone',
+        'postal_code',
+        'tracking_number',
+        'stripe_session_id',
+        'stripe_payment_intent',
+    )
     list_select_related = ('user',)
-    readonly_fields = ('created_at', 'paid_at', 'total', 'shipping_cost', 'stripe_session_id', 'stripe_payment_intent')
+    readonly_fields = (
+        'created_at',
+        'paid_at',
+        'shipped_at',
+        'customer_link',
+        'subtotal_display',
+        'total',
+        'shipping_cost',
+        'shipping_address',
+        'phone',
+        'stripe_session_id',
+        'stripe_payment_intent',
+        'confirmation_sent_at',
+    )
+    fieldsets = (
+        (None, {'fields': ('user', 'customer_link', 'status', 'paid', 'created_at', 'paid_at')}),
+        ('Fulfilment', {'fields': ('shipping_address', 'phone', 'tracking_number', 'shipped_at')}),
+        ('Totals', {'fields': ('subtotal_display', 'shipping_cost', 'total')}),
+        (
+            'Payment',
+            {
+                'classes': ('collapse',),
+                'fields': ('stripe_session_id', 'stripe_payment_intent', 'confirmation_sent_at'),
+            },
+        ),
+    )
     raw_id_fields = ('user',)
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
     inlines = [OrderItemInline]
-    actions = ['refund_via_stripe', 'mark_reviewed']
+    actions = ['mark_shipped', 'refund_via_stripe', 'mark_reviewed']
+
+    @admin.display(description='Customer', ordering='user__username')
+    def customer(self, obj):
+        if obj.user is None:
+            return obj.full_name or '-'
+        return obj.user.get_full_name() or obj.user.username
+
+    @admin.display(description='Customer account')
+    def customer_link(self, obj):
+        if obj.user_id is None:
+            return '-'
+        url = reverse('admin:auth_user_change', args=[obj.user_id])
+        return format_html('<a href="{}">{}</a> ({})', url, obj.user.username, obj.user.email or 'no email')
+
+    @admin.display(description='Subtotal')
+    def subtotal_display(self, obj):
+        return obj.subtotal
+
+    @admin.display(description='Shipping address')
+    def shipping_address(self, obj):
+        lines = obj.shipping_address_lines()
+        if not lines:
+            return 'No address collected'
+        return format_html_join(mark_safe('<br>'), '{}', ((line,) for line in lines))
+
+    def save_model(self, request, obj, form, change):
+        # Setting the status to "Shipped" by hand behaves like the "Mark as shipped" action.
+        newly_shipped = (
+            change and 'status' in form.changed_data and obj.status == Order.STATUS_SHIPPED and not obj.shipped_at
+        )
+        if newly_shipped:
+            obj.shipped_at = timezone.now()
+        super().save_model(request, obj, form, change)
+        if newly_shipped:
+            from shop.tasks import send_order_status_email
+
+            transaction.on_commit(partial(send_order_status_email.delay, obj.pk, 'shipped'))
+
+    @admin.action(description='Mark as shipped (emails the customer)')
+    def mark_shipped(self, request, queryset):
+        from shop.views.order import mark_order_shipped
+
+        shipped = 0
+        for order in queryset:
+            try:
+                mark_order_shipped(order)
+                shipped += 1
+            except ValueError as exc:
+                self.message_user(request, f"Order #{order.pk} not shipped: {exc}.", messages.WARNING)
+        if shipped:
+            self.message_user(
+                request,
+                f"Marked {shipped} order(s) as shipped. Add tracking numbers on each order before shipping "
+                "if you want them in the email.",
+                messages.SUCCESS,
+            )
 
     @admin.action(description='Refund via Stripe (full amount)')
     def refund_via_stripe(self, request, queryset):

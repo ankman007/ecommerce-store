@@ -1,0 +1,18 @@
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; margin: 16px 0;">
+  {% for item in items %}
+  <tr>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">{{ item.quantity }} &times; {{ item.product.name|default:"Deleted product" }}</td>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${{ item.subtotal|floatformat:2 }}</td>
+  </tr>
+  {% endfor %}
+  <tr><td style="padding: 6px 0; color: #6b7280;">Subtotal</td><td style="padding: 6px 0; text-align: right;">${{ order.subtotal|floatformat:2 }}</td></tr>
+  <tr><td style="padding: 6px 0; color: #6b7280;">Shipping</td><td style="padding: 6px 0; text-align: right;">${{ order.shipping_cost|floatformat:2 }}</td></tr>
+  <tr><td style="padding: 6px 0; font-weight: bold;">Total</td><td style="padding: 6px 0; text-align: right; font-weight: bold;">${{ order.total|floatformat:2 }}</td></tr>
+</table>
+{% if order.has_shipping_address %}
+<p style="margin: 16px 0 4px; font-weight: bold;">Shipping to</p>
+<p style="margin: 0; color: #374151;">
+  {% for line in order.shipping_address_lines %}{{ line }}<br>{% endfor %}
+  {% if order.phone %}Phone: {{ order.phone }}{% endif %}
+</p>
+{% endif %}

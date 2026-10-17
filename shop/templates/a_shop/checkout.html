@@ -1,0 +1,88 @@
+{% extends 'layouts/blank.html' %}
+{% block title %}Checkout | A One Albany Wholesale{% endblock %}
+{% block meta_extra %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block content %}
+<div class="container my-5">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small mb-0">
+      <li class="breadcrumb-item"><a href="{% url 'cart' %}" class="text-decoration-none">Cart</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Shipping details</li>
+      <li class="breadcrumb-item text-muted">Payment</li>
+    </ol>
+  </nav>
+  <h1 class="mb-4">Shipping details</h1>
+
+  <div class="row g-4 align-items-start">
+    <div class="col-lg-7">
+      <form id="checkout-form" class="checkout-form card border-0 rounded-4 p-4 product-card" style="transform: none;"
+        action="{% url 'checkout_address' %}" method="POST" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger text-white">{{ form.non_field_errors|join:" " }}</div>
+        {% endif %}
+        <div class="row g-3">
+          {% for field in form %}
+          <div class="{% if field.name == 'full_name' or field.name == 'phone' or field.name == 'address_line1' or field.name == 'address_line2' %}col-12{% if field.name == 'full_name' or field.name == 'phone' %} col-md-6{% endif %}{% else %}col-md-6{% endif %}">
+            <label for="{{ field.id_for_label }}" class="form-label small fw-semibold">
+              {{ field.label }}{% if field.field.required %} <span class="text-danger" aria-hidden="true">*</span>{% endif %}
+            </label>
+            {{ field }}
+            {% if field.errors %}
+              <div class="invalid-feedback d-block">{{ field.errors|join:" " }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <p class="small text-muted mt-3 mb-0">
+          We use your phone number only if the courier needs to reach you about this delivery.
+        </p>
+        <button id="checkout-button" type="submit"
+          class="w-100 mt-4 d-inline-flex align-items-center justify-content-center gap-2">
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          <i class="bi bi-lock-fill"></i>
+          <span class="label">Continue to payment</span>
+        </button>
+      </form>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card border-0 rounded-4 p-4 product-card" style="transform: none;">
+        <h5 class="fw-semibold mb-3">Order summary</h5>
+        <ul class="list-unstyled mb-3">
+          {% for item in items %}
+          <li class="d-flex justify-content-between gap-3 small mb-2">
+            <span>{{ item.quantity }} &times; {{ item.product.name }}</span>
+            <span>${{ item.subtotal|floatformat:2 }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><span>${{ subtotal|floatformat:2 }}</span></div>
+        <div class="d-flex justify-content-between mb-2"><span>Shipping</span><span>${{ shipping_cost|floatformat:2 }}</span></div>
+        <hr>
+        <div class="d-flex justify-content-between fw-bold fs-5"><span>Total</span><span>${{ total|floatformat:2 }}</span></div>
+        <p class="small text-muted mt-3 mb-0 d-flex gap-2">
+          <i class="bi bi-shield-lock"></i>
+          <span>You'll pay on Stripe's secure checkout page. We never see your card details.</span>
+        </p>
+        <a href="{% url 'cart' %}" class="small text-decoration-none mt-3"><i class="bi bi-arrow-left me-1"></i>Back to cart</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .checkout-form label { display: block !important; }
+  .checkout-form input, .checkout-form select { padding: 0.6rem 0.9rem; background: #fff; }
+  #checkout-button .spinner-border { display: none; }
+  #checkout-button.loading .spinner-border { display: inline-block; }
+</style>
+<script>
+  // Prevent double submission (which would open two Stripe sessions) and show progress.
+  document.getElementById("checkout-form").addEventListener("submit", function (event) {
+    const button = this.querySelector("#checkout-button");
+    button.disabled = true;
+    button.classList.add("loading");
+    button.querySelector(".label").textContent = "Redirecting to secure checkout…";
+  });
+</script>
+{% endblock %}

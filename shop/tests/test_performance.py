@@ -55,7 +55,11 @@ class ReadPathQueryCountTests(TestCase):
     # Anonymous: products + images prefetch + categories (+ session) — no per-product queries.
     def test_home(self):
         response = self.assertMaxQueries(reverse('home'), 5)
-        self.assertEqual(len(response.context['products']), 15)
+        # Paginated since 0006 (12 per page); the bound must hold for later pages too.
+        self.assertEqual(len(response.context['products']), 12)
+        self.assertEqual(response.context['paginator'].count, 15)
+        response = self.assertMaxQueries(reverse('home') + '?page=2&sort=price_desc&in_stock=1', 5)
+        self.assertEqual(len(response.context['products']), 3)
 
     def test_category(self):
         self.assertMaxQueries(reverse('category', args=[self.categories[0].slug]), 6)

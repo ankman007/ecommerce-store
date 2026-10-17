@@ -1,0 +1,12 @@
+{% autoescape off %}Order #{{ order.id }}
+{% for item in items %}
+- {{ item.quantity }} x {{ item.product.name|default:"Deleted product" }} @ ${{ item.price }} = ${{ item.subtotal|floatformat:2 }}{% endfor %}
+
+Subtotal: ${{ order.subtotal|floatformat:2 }}
+Shipping: ${{ order.shipping_cost|floatformat:2 }}
+Total:    ${{ order.total|floatformat:2 }}
+{% if order.has_shipping_address %}
+Shipping to:
+{% for line in order.shipping_address_lines %}{{ line }}
+{% endfor %}{% if order.phone %}Phone: {{ order.phone }}
+{% endif %}{% endif %}{% endautoescape %}

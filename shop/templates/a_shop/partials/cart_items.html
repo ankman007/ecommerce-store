@@ -15,9 +15,9 @@
         <a href="{% url 'product_detail' product.id %}" class="cart-line-image rounded-3 overflow-hidden d-flex align-items-center justify-content-center">
           {% with image=product.images.all.0 %}
             {% if image %}
-              <img src="{{ image.images.url }}" alt="{{ image.alt_text|default:product.name }}">
+              <img src="{{ image.images.url }}" alt="{{ image.alt }}" loading="lazy" decoding="async" width="96" height="96">
             {% else %}
-              <i class="bi bi-image text-muted fs-3"></i>
+              <i class="bi bi-image text-muted fs-3" role="img" aria-label="No image"></i>
             {% endif %}
           {% endwith %}
         </a>
@@ -82,8 +82,8 @@
       </div>
 
       {% if user.is_authenticated %}
-      <form id="checkout-form" action="{% url 'checkout' %}" method="POST">
-        {% csrf_token %}
+      {# Step 1 is the shipping-details page; it creates the Stripe session on submit. #}
+      <form id="checkout-form" action="{% url 'checkout_address' %}" method="GET">
         <button id="checkout-button" type="submit"
           class="w-100 d-inline-flex align-items-center justify-content-center gap-2{% if has_stock_issue %} opacity-50 cursor-not-allowed{% endif %}"
           {% if has_stock_issue %}disabled{% endif %}>

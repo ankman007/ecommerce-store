@@ -1,0 +1,11 @@
+{% autoescape off %}Hi {{ customer_name }},
+
+Your order #{{ order.id }} has been refunded in full (${{ order.total|floatformat:2 }}).
+The refund goes back to your original payment method and usually appears within 5-10 business days, depending on your bank.
+
+{% include 'a_shop/emails/_order_summary.txt' %}
+View your order: {{ order_url }}
+
+A One Albany Wholesale
+{{ site_url }}
+{% endautoescape %}

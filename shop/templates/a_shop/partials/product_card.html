@@ -3,9 +3,9 @@
     <a href="{% url 'product_detail' product.id %}" class="product-card-image rounded-3 mb-3">
       {% with first_image=product.images.all.0 %}
         {% if first_image %}
-          <img src="{{ first_image.images.url }}" alt="{{ first_image.alt_text|default:product.name }}" loading="lazy">
+          <img src="{{ first_image.images.url }}" alt="{{ first_image.alt }}" loading="lazy" decoding="async" width="600" height="600">
         {% else %}
-          <span class="text-muted small"><i class="bi bi-image fs-2 d-block text-center"></i>No image</span>
+          <span class="product-image-placeholder text-muted small" role="img" aria-label="No image available for {{ product.name }}"><i class="bi bi-image fs-2 d-block text-center" aria-hidden="true"></i>No image</span>
         {% endif %}
       {% endwith %}
     </a>

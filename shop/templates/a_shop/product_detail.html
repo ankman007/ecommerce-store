@@ -1,4 +1,23 @@
 {% extends 'layouts/blank.html' %}
+{% block title %}{{ product.name }}{% if product.category %} | {{ product.category.name }}{% endif %} | A One Albany Wholesale{% endblock %}
+{% block meta_description %}{% if product.description %}{{ product.description|striptags }}{% else %}Buy {{ product.name }} for ${{ product.price }} at A One Albany Wholesale.{% endif %}{% endblock %}
+{% block og_tags %}
+{% with base=request.scheme|add:"://"|add:request.get_host first_image=product.images.all.0 %}
+    <meta property="og:type" content="product" />
+    <meta property="og:title" content="{{ product.name }}" />
+    <meta property="og:description" content="{% if product.description %}{{ product.description|striptags|truncatechars:200 }}{% else %}Buy {{ product.name }} at A One Albany Wholesale.{% endif %}" />
+    <meta property="og:url" content="{{ base }}{{ product.get_absolute_url }}" />
+    {% if first_image %}
+    <meta property="og:image" content="{% if first_image.images.url|slice:':4' == 'http' %}{{ first_image.images.url }}{% else %}{{ base }}{{ first_image.images.url }}{% endif %}" />
+    <meta property="og:image:alt" content="{{ first_image.alt }}" />
+    {% endif %}
+    <meta property="product:price:amount" content="{{ product.price }}" />
+    <meta property="product:price:currency" content="USD" />
+    <meta property="product:availability" content="{% if product.stock > 0 %}in stock{% else %}out of stock{% endif %}" />
+    <meta name="twitter:card" content="{% if first_image %}summary_large_image{% else %}summary{% endif %}" />
+{% endwith %}
+{% endblock %}
+{% block canonical_url %}{{ request.scheme }}://{{ request.get_host }}{{ product.get_absolute_url }}{% endblock %}
 {% block content %}
 <div class="container my-5">
   <nav aria-label="breadcrumb" class="mb-4">
@@ -32,10 +51,12 @@
             <img
               id="main-product-image"
               src="{{ images.0.images.url }}"
-              alt="{{ product.name }} image"
+              alt="{{ images.0.alt }}"
               class="img-fluid"
-              loading="lazy"
-              style="max-height: 100%; object-fit: contain; transition: opacity 0.3s ease;" />
+              fetchpriority="high"
+              decoding="async"
+              width="1200" height="1200"
+              style="max-height: 100%; width: auto; height: auto; object-fit: contain; transition: opacity 0.3s ease;" />
 
             {% if images|length > 1 %}
               <button
@@ -54,8 +75,10 @@
               {% for image in images %}
                 <img
                   src="{{ image.images.url }}"
-                  alt="{{ product.name }} thumbnail"
+                  alt="{{ image.alt }} (image {{ forloop.counter }})"
                   loading="lazy"
+                  decoding="async"
+                  width="80" height="80"
                   class="img-thumbnail"
                   style="height: 80px; width: 80px; object-fit: cover; cursor: pointer;"
                   onclick="showImageAtIndex({{ forloop.counter0 }})" />
@@ -64,7 +87,7 @@
           {% endif %}
         {% else %}
           <div class="d-flex align-items-center justify-content-center bg-light rounded mb-3" style="height: 500px">
-            <div class="text-muted fs-5">No image available</div>
+            <div class="text-muted fs-5 text-center" role="img" aria-label="No image available for {{ product.name }}"><i class="bi bi-image d-block fs-1 mb-2" aria-hidden="true"></i>No image available</div>
           </div>
         {% endif %}
       {% endwith %}
