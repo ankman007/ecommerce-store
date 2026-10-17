@@ -55,6 +55,23 @@ pre-commit run --all-files   # optional: check everything once
 
 To make `git blame` skip the bulk formatting commit: `git config blame.ignoreRevsFile .git-blame-ignore-revs`
 
+### Stripe webhooks and background jobs
+
+Orders are confirmed by Stripe webhooks, so they complete even if the customer closes the tab after paying.
+
+1. Put your **test** keys in `.env` (`STRIPE_SECRET_KEY`, `STRIPE_PUBLIC_KEY`) and add `COMPOSE_PROFILES=stripe`.
+2. Get the local signing secret and put it in `.env` as `STRIPE_WEBHOOK_SECRET`:
+   ```bash
+   docker compose run --rm stripe listen --print-secret
+   ```
+3. `docker compose up -d` now also runs the Stripe CLI, which forwards events to `/stripe/webhook/`.
+
+`celery-beat` runs `expire_stale_checkouts` every 15 minutes: it cancels abandoned checkouts (sessions expire after 60 minutes) and completes any paid order whose webhook was missed.
+
+Paid orders that need attention (stock ran out after payment, amount mismatch) get the status **Paid - needs review** and the shop is emailed. Resolve them in the admin with **Refund via Stripe** or **Mark reviewed**.
+
+In production, add the endpoint `https://<your-domain>/stripe/webhook/` in the Stripe dashboard for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`, and use its signing secret.
+
 ### Continuous integration
 
 `.github/workflows/ci.yml` runs on every push to `main` and every pull request:

@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.contrib.sessions.backends.db import SessionStore
+from django.db import IntegrityError, transaction
 from django.test import TestCase, RequestFactory
 from django.urls import reverse
 
@@ -89,8 +90,10 @@ class CreateCheckoutTests(CheckoutBase):
         self.assertIn(reverse('account_login'), resp['Location'])
         create.assert_not_called()
 
-    def test_duplicate_carts_do_not_crash(self):
-        Cart.objects.create(user=self.user)
+    def test_duplicate_active_carts_are_rejected_by_the_database(self):
+        # Previously duplicates could appear under concurrency; now the DB refuses them.
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Cart.objects.create(user=self.user)
         resp = self.client.get(reverse('cart'))
         self.assertEqual(resp.status_code, 200)
 

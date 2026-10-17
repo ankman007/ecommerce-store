@@ -4,8 +4,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.html import escape
-from shop.models import Product, CartItem
-from shop.utils import get_user_cart
+from shop.models import Product
+from shop.utils import change_cart_line, get_user_cart
 
 # Single source of truth for shipping: used by the cart page and by Stripe checkout.
 SHIPPING_COST = Decimal('5.00')
@@ -36,14 +36,7 @@ def merge_session_cart_into_user_cart(request, user):
         return
     cart = get_user_cart(user, create=True)
     for product in Product.objects.filter(id__in=session_cart.keys()):
-        qty = session_cart[str(product.id)]
-        item, created = CartItem.objects.get_or_create(cart=cart, product=product, defaults={'quantity': 0})
-        new_qty = min(item.quantity + qty, product.stock)
-        if new_qty <= 0:
-            item.delete()
-        else:
-            item.quantity = new_qty
-            item.save(update_fields=['quantity'])
+        change_cart_line(cart, product, add=session_cart[str(product.id)])
     request.session['cart'] = {}
     request.session.modified = True
 
@@ -131,11 +124,7 @@ def add_to_cart(request, product_id):
 
     if request.user.is_authenticated:
         cart = get_user_cart(request.user, create=True)
-        item, _ = CartItem.objects.get_or_create(cart=cart, product=product, defaults={'quantity': 0})
-        existing = item.quantity
-        new_qty = min(existing + quantity, product.stock)
-        item.quantity = new_qty
-        item.save(update_fields=['quantity'])
+        existing, new_qty = change_cart_line(cart, product, add=quantity)
     else:
         cart_data = get_session_cart(request)
         existing = cart_data.get(str(product_id), 0)
@@ -188,11 +177,8 @@ def update_cart_item(request, product_id):
 
     if request.user.is_authenticated:
         cart = get_user_cart(request.user)
-        if cart:
-            if qty == 0:
-                cart.items.filter(product=product).delete()
-            else:
-                cart.items.filter(product=product).update(quantity=qty)
+        if cart and cart.items.filter(product=product).exists():
+            change_cart_line(cart, product, quantity=qty)
     else:
         cart_data = get_session_cart(request)
         if str(product_id) in cart_data:

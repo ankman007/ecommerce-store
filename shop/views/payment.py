@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from decimal import Decimal
 
 import stripe
@@ -31,6 +32,20 @@ def _field(obj, key):
 
 def _to_cents(amount):
     return int((Decimal(amount) * 100).quantize(Decimal('1')))
+
+
+# Stripe's minimum is 30 minutes; pending orders past this are cleaned up by
+# shop.tasks.expire_stale_checkouts.
+CHECKOUT_SESSION_TTL = timedelta(minutes=60)
+
+
+def _flag_for_review(order, reason):
+    """Mark an order for manual review and email the shop once the transaction commits."""
+    from shop.tasks import notify_order_needs_review
+
+    order.status = Order.STATUS_NEEDS_REVIEW
+    order.save(update_fields=['status'])
+    transaction.on_commit(lambda: notify_order_needs_review.delay(order.id, reason))
 
 
 def _toast(message):
@@ -108,6 +123,7 @@ def create_checkout_session(request):
             customer_email=request.user.email or None,
             success_url=request.build_absolute_uri(reverse('success')) + '?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=request.build_absolute_uri(reverse('cancel')),
+            expires_at=int((timezone.now() + CHECKOUT_SESSION_TTL).timestamp()),
         )
     except stripe.StripeError:
         logger.exception("Stripe checkout session creation failed for order {}", order.id)
@@ -125,8 +141,9 @@ def fulfill_checkout_session(checkout_session):
     """Idempotently mark the order for a paid Stripe Checkout Session as paid.
 
     Returns (order, result) where result is one of:
-    'paid' (processed now), 'already_paid', 'unpaid', 'not_found', 'amount_mismatch'.
-    Shared by the success redirect and the webhook.
+    'paid' (processed now; the order may be flagged needs_review if stock ran out),
+    'already_paid', 'unpaid', 'not_found', 'amount_mismatch'.
+    Shared by the success redirect, the webhook and the stale-checkout cleanup task.
     """
     session_id = _field(checkout_session, 'id')
     if not session_id:
@@ -141,13 +158,20 @@ def fulfill_checkout_session(checkout_session):
         if order.paid:
             return order, 'already_paid'
 
+        order.stripe_payment_intent = _field(checkout_session, 'payment_intent') or order.stripe_payment_intent
+        order.save(update_fields=['stripe_payment_intent'])
+
         amount_total = _field(checkout_session, 'amount_total')
         if amount_total is not None and int(amount_total) != _to_cents(order.total):
             logger.error(
                 "Amount mismatch for order {}: stripe={} expected={}", order.id, amount_total, _to_cents(order.total)
             )
+            # The customer was charged, so don't leave this silently pending: a person must check it.
+            if order.status != Order.STATUS_NEEDS_REVIEW:
+                _flag_for_review(order, f"Stripe charged {amount_total} cents but the order total is {order.total}.")
             return order, 'amount_mismatch'
 
+        oversold = []
         for item in order.items.all():
             if not item.product_id:
                 continue
@@ -158,11 +182,14 @@ def fulfill_checkout_session(checkout_session):
                 # Paid but oversold (concurrent purchase): never go negative; flag for review.
                 Product.objects.filter(pk=item.product_id).update(stock=0)
                 logger.warning("Order {} oversold product {}; needs manual review", order.id, item.product_id)
+                oversold.append(str(item))
 
         order.paid = True
         order.status = Order.STATUS_PAID
         order.paid_at = timezone.now()
         order.save(update_fields=['paid', 'status', 'paid_at'])
+        if oversold:
+            _flag_for_review(order, "Paid, but stock ran out for: " + ", ".join(oversold))
 
         if order.user_id:
             product_ids = [i.product_id for i in order.items.all() if i.product_id]
@@ -218,10 +245,25 @@ def stripe_webhook(request):
         return HttpResponseBadRequest("Invalid signature")
 
     event_type = _field(event, 'type')
+    checkout_session = _field(_field(event, 'data'), 'object')
     if event_type in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
-        checkout_session = _field(_field(event, 'data'), 'object')
         fulfill_checkout_session(checkout_session)
+    elif event_type in ('checkout.session.expired', 'checkout.session.async_payment_failed'):
+        cancel_unpaid_order(_field(checkout_session, 'id'))
     return HttpResponse(status=200)
+
+
+def cancel_unpaid_order(session_id):
+    """Cancel the pending order for a Checkout Session that can no longer be paid. Idempotent."""
+    if not session_id:
+        return None
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(stripe_session_id=session_id).first()
+        if order is None or order.paid or order.status != Order.STATUS_PENDING:
+            return order
+        order.status = Order.STATUS_CANCELLED
+        order.save(update_fields=['status'])
+    return order
 
 
 def cancel(request):
@@ -232,3 +274,22 @@ def cancel(request):
         ),
     )
     return redirect('cart')
+
+
+REFUNDABLE_STATUSES = (Order.STATUS_PAID, Order.STATUS_NEEDS_REVIEW, Order.STATUS_SHIPPED)
+
+
+def refund_order(order):
+    """Fully refund an order's Stripe payment and mark it refunded.
+
+    Uses an idempotency key, so retrying (or a double-click in the admin) never refunds twice.
+    Stock is not restored automatically. Raises ValueError if the order can't be refunded.
+    """
+    if order.status not in REFUNDABLE_STATUSES:
+        raise ValueError(f"order is {order.get_status_display().lower()}")
+    if not order.stripe_payment_intent:
+        raise ValueError("no Stripe payment is recorded for this order")
+    stripe.Refund.create(payment_intent=order.stripe_payment_intent, idempotency_key=f"refund-order-{order.pk}")
+    order.status = Order.STATUS_REFUNDED
+    order.save(update_fields=['status'])
+    return order

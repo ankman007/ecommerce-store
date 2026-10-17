@@ -48,6 +48,14 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_TRACK_STARTED = True
 CELERY_SEND_EVENTS = True
+CELERY_TIMEZONE = 'UTC'
+CELERY_BEAT_SCHEDULE = {
+    # Cancel abandoned checkouts and catch any payment whose webhook was missed.
+    'expire-stale-checkouts': {
+        'task': 'shop.tasks.expire_stale_checkouts',
+        'schedule': 15 * 60,
+    },
+}
 
 INSTALLED_APPS = [
     'django.contrib.admin',

@@ -10,7 +10,7 @@ Audit and hardening pass over the Django eCommerce store, done by five parallel 
 | Performance | Home page 44 → 3 queries, search 41 → 3, category/product 12 → 4 |
 | Security | Production hardening in settings, fail-fast secret key, form validation, Flower bound to localhost |
 | Storefront UX | Reworked catalog, product, cart, order pages; footer categories fixed site-wide |
-| Tests | 0 → **112 tests, all passing** |
+| Tests | 0 → **130 tests, all passing** |
 | Lint | `ruff` (pyflakes + syntax) clean apart from one pre-existing star import |
 
 ## Changes by area
@@ -84,6 +84,7 @@ Audit and hardening pass over the Django eCommerce store, done by five parallel 
 | `shop/tests/test_performance.py` | 8 |
 | `shop/tests/test_contact.py` | 4 |
 | `shop/tests/test_storefront.py` | 11 |
+| `shop/tests/test_payment_ops.py` | 18 |
 | `users/tests.py` | 26 |
 
 - All Stripe calls in tests are mocked.
@@ -106,13 +107,20 @@ Audit and hardening pass over the Django eCommerce store, done by five parallel 
 - **Orders:** the list shows order cards with status badge, total and thumbnails, linking to a detail page. Customers can only see their own paid orders. The empty states are friendly and point to the catalog.
 - **Header:** the desktop and mobile cart badges both update, since they previously shared one HTML id. The badge is hidden when the cart is empty, and the mobile menu has an Orders link.
 
+### Payment operations (Phase 1)
+- **Webhooks work locally:** a `stripe` Compose service (Stripe CLI, opt-in with `COMPOSE_PROFILES=stripe`) forwards test-mode events to `/stripe/webhook/`. Verified live: a real test payment with the success redirect blocked was still fulfilled by `checkout.session.completed`.
+- **Abandoned checkouts:** Stripe sessions now expire after 60 minutes. `checkout.session.expired` cancels the order, and a Celery Beat job (`expire_stale_checkouts`, every 15 minutes) asks Stripe about any pending order past its expiry: paid ones are fulfilled (a missed webhook), open ones are expired, the rest are cancelled.
+- **Constraints and indexes** (migration `0005`, with a data clean-up step that runs first): one active cart per user, one line per product per cart, unique `stripe_session_id`, and indexes on `Order(user, -created_at)` and `Order(status, created_at)`.
+- **No lost cart updates:** cart lines are changed inside a transaction with the row locked, and cart creation tolerates a concurrent request creating it first.
+- **Needs review and refunds:** if stock runs out after payment, or Stripe's amount doesn't match the order, the order becomes "Paid - needs review" and the shop is emailed. The Stripe payment intent is stored on every paid order; admin actions "Refund via Stripe" (idempotent) and "Mark reviewed" resolve flagged orders. Customers see "Refunded" on their orders page.
+
 ### Developer tooling
 - `python manage.py seed_demo_data [--reset]` seeds 19 demo products in 5 categories with generated images, plus a test customer.
 
 ## Verification
 
 ```bash
-docker compose exec web python manage.py test --settings=core.test_settings   # 112 tests, OK
+docker compose exec web python manage.py test --settings=core.test_settings   # 130 tests, OK
 docker compose exec web python manage.py check                                # no errors
 docker compose exec web python manage.py makemigrations --check --dry-run     # no changes
 ```
@@ -136,14 +144,11 @@ All are optional and have safe defaults; see `.env.example`.
 
 | Priority | Issue | Suggested fix |
 |---|---|---|
-| High | The webhook isn't configured locally, so a payment completed on Stripe is only fulfilled when the customer returns to `/success/` | Run `stripe listen --forward-to localhost:8085/stripe/webhook/` and put the `whsec_…` value in `.env`; register the endpoint in the Stripe dashboard for production |
 | High | CKEditor 4 is unsupported and has known security issues (admin-only) | Move to `django-ckeditor-5` or a plain text field with sanitising |
-| Medium | Abandoned checkouts stay `pending` forever | A periodic Celery task that cancels pending orders older than about 24h (Stripe sessions expire after 24h) |
-| Medium | If an item sells out after the customer has paid, the order is still marked paid and only a warning is logged | Add a "needs review" status and refund or notify |
-| Medium | Recommended database constraints and indexes not yet applied | One active cart per user; unique `(cart, product)`; `unique=True` on `stripe_session_id`; indexes on `Order(user, created_at)` and `Product(category)` |
-| Medium | Concurrent add-to-cart requests may lose updates (not verified) | Use `F('quantity') + n` inside `transaction.atomic` |
 | Low | No coupon or discount system (none existed) | Build only if needed |
-| Low | `Payment` model is unused | Remove it, or record Stripe payment intents in it |
+| High | The production Stripe webhook endpoint isn't registered yet (local forwarding works) | In the Stripe dashboard add `https://<domain>/stripe/webhook/` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`; put its signing secret in the server's `STRIPE_WEBHOOK_SECRET` |
+| Low | `Payment` model is unused (payment intents are now stored on `Order`) | Remove it |
+| Low | Refunds don't restore stock | Restock automatically for refunds of orders that were not oversold, if the business wants that |
 | Low | The verification-email link sends on GET; profile settings read `emailaddress_set.first` instead of the primary address | Switch to POST; use the primary address |
 | Low | Star import in `users/urls.py` | Use explicit imports |
 | Low | Django 6.1 deprecates the `EMAIL_*` settings | Migrate to `MAILERS` before Django 7 |
@@ -151,6 +156,6 @@ All are optional and have safe defaults; see `.env.example`.
 
 ## Recommendations
 1. ~~Commit this work and add a GitHub Actions job that runs the test suite on every push.~~ Done: `.github/workflows/ci.yml` (lint + tests), pre-commit hooks and `.gitattributes`.
-2. Configure the Stripe webhook before going live; it makes order creation independent of the customer's browser.
+2. ~~Configure the Stripe webhook~~ Done locally (Stripe CLI container); register the production endpoint before going live.
 3. Apply the recommended constraints in a dedicated migration, after checking existing production data for duplicate carts.
 4. Before deploying, the production server needs Python 3.12+, `pip install -r requirements.txt` and `python manage.py migrate` (migrations `0003`, `0004`).

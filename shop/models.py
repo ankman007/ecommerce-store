@@ -83,6 +83,15 @@ class Cart(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        constraints = [
+            # One active cart per user; stops concurrent requests creating duplicates.
+            # (MySQL can't enforce conditional unique constraints, hence (user, is_active).
+            # Nothing deactivates carts today; archiving more than one per user would need
+            # deleting old inactive carts first.)
+            models.UniqueConstraint(fields=['user', 'is_active'], name='unique_cart_per_user_state'),
+        ]
+
     def __str__(self):
         return f"Cart for {self.user.username} - Created at {self.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
 
@@ -91,6 +100,11 @@ class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_product')
     quantity = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['cart', 'product'], name='unique_product_per_cart'),
+        ]
 
     def subtotal(self):
         return self.quantity * Decimal(self.product.price)
@@ -122,22 +136,33 @@ class Order(models.Model):
     STATUS_PAID = 'paid'
     STATUS_SHIPPED = 'shipped'
     STATUS_CANCELLED = 'cancelled'
+    STATUS_NEEDS_REVIEW = 'needs_review'
+    STATUS_REFUNDED = 'refunded'
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Pending'),
         (STATUS_PAID, 'Paid'),
+        (STATUS_NEEDS_REVIEW, 'Paid - needs review'),
         (STATUS_SHIPPED, 'Shipped'),
+        (STATUS_REFUNDED, 'Refunded'),
         (STATUS_CANCELLED, 'Cancelled'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    stripe_session_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    stripe_session_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    stripe_payment_intent = models.CharField(max_length=255, blank=True, null=True)
     # `paid` is kept for backwards compatibility; `status` is the richer source of truth.
     paid = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='order_user_created_idx'),
+            models.Index(fields=['status', 'created_at'], name='order_status_created_idx'),
+        ]
 
     def __str__(self):
         return f"Order #{self.id} by {self.user}"

@@ -39,6 +39,31 @@ services:
       redis:
         condition: service_healthy
 
+  celery-beat:
+    build: .
+    # Periodic tasks (see CELERY_BEAT_SCHEDULE); schedule state lives in /tmp, not the repo.
+    command: celery -A core beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  stripe:
+    # Forwards Stripe test-mode webhooks to the app. Opt-in: needs real test keys in .env.
+    # Enable with COMPOSE_PROFILES=stripe in .env (or: docker compose --profile stripe up -d).
+    image: stripe/stripe-cli:v1.54.0
+    profiles: ["stripe"]
+    command: >
+      listen --forward-to web:8000/stripe/webhook/
+      --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY}
+    depends_on:
+      - web
+
   flower:
     build: .
     command: celery -A core flower --port=5555

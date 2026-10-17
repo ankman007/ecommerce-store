@@ -1,4 +1,5 @@
-from django.contrib import admin
+import stripe
+from django.contrib import admin, messages
 from django import forms
 from ckeditor.widgets import CKEditorWidget
 from .models import (
@@ -11,10 +12,6 @@ from .models import (
     Order,
     OrderItem,
 )
-
-
-def _has_field(model, name):
-    return any(f.name == name for f in model._meta.get_fields())
 
 
 class ProductImageInline(admin.TabularInline):
@@ -108,17 +105,44 @@ class OrderItemInline(admin.TabularInline):
         return super().get_queryset(request).select_related('product')
 
 
-_order_status = ('status',) if _has_field(Order, 'status') else ()
-
-
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'created_at', 'paid') + _order_status + ('stripe_session_id',)
-    list_filter = ('paid',) + _order_status + ('created_at',)
-    search_fields = ('id', 'user__username', 'user__email', 'stripe_session_id')
+    list_display = ('id', 'user', 'created_at', 'status', 'total', 'paid_at')
+    list_filter = ('status', 'paid', 'created_at')
+    search_fields = ('id', 'user__username', 'user__email', 'stripe_session_id', 'stripe_payment_intent')
     list_select_related = ('user',)
-    readonly_fields = ('created_at', 'stripe_session_id')
+    readonly_fields = ('created_at', 'paid_at', 'total', 'shipping_cost', 'stripe_session_id', 'stripe_payment_intent')
     raw_id_fields = ('user',)
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
     inlines = [OrderItemInline]
+    actions = ['refund_via_stripe', 'mark_reviewed']
+
+    @admin.action(description='Refund via Stripe (full amount)')
+    def refund_via_stripe(self, request, queryset):
+        from shop.views.payment import refund_order
+
+        refunded = 0
+        for order in queryset:
+            try:
+                refund_order(order)
+                refunded += 1
+            except ValueError as exc:
+                self.message_user(request, f"Order #{order.pk} not refunded: {exc}.", messages.WARNING)
+            except stripe.StripeError as exc:
+                self.message_user(
+                    request,
+                    f"Order #{order.pk}: Stripe refused the refund ({exc.user_message or exc}).",
+                    messages.ERROR,
+                )
+        if refunded:
+            self.message_user(
+                request,
+                f"Refunded {refunded} order(s). Stock was not restored; adjust it on the products if needed.",
+                messages.SUCCESS,
+            )
+
+    @admin.action(description='Mark reviewed (keep as paid)')
+    def mark_reviewed(self, request, queryset):
+        updated = queryset.filter(status=Order.STATUS_NEEDS_REVIEW, paid=True).update(status=Order.STATUS_PAID)
+        self.message_user(request, f"{updated} order(s) marked as reviewed.", messages.SUCCESS)

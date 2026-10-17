@@ -78,8 +78,9 @@ class ReadPathQueryCountTests(TestCase):
         self.assertEqual(response.context['cart_count'], 10)
         self.assertEqual(response.context['cart_product_ids'], {p.id for p in self.products[:5]})
 
-    def test_multiple_carts_do_not_crash(self):
-        Cart.objects.create(user=self.user)
+    def test_user_with_inactive_cart_stays_within_budget(self):
+        # Only one active cart per user is possible now; an archived cart must not confuse lookups.
+        Cart.objects.create(user=self.user, is_active=False)
         Cart.objects.create(user=self.user)
         self.client.force_login(self.user)
         self.assertMaxQueries(reverse('home'), 10)
