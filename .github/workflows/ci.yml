@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - run: pip install -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check --output-format=github .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    env:
+      # SQLite in memory, eager Celery, locmem email, dummy Stripe keys: no services needed
+      DJANGO_SETTINGS_MODULE: core.test_settings
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install MySQL client headers (needed to build mysqlclient)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends default-libmysqlclient-dev pkg-config
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Django system checks
+        run: python manage.py check
+
+      - name: Migrations are up to date
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Run tests
+        run: python manage.py test --parallel auto

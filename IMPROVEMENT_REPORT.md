@@ -150,7 +150,7 @@ All are optional and have safe defaults; see `.env.example`.
 | Info | Stripe isn't available to merchants in Nepal | Add Khalti/eSewa behind the same "verify on the server, then fulfil" flow |
 
 ## Recommendations
-1. Commit this work and add a GitHub Actions job that runs the test suite on every push.
+1. ~~Commit this work and add a GitHub Actions job that runs the test suite on every push.~~ Done: `.github/workflows/ci.yml` (lint + tests), pre-commit hooks and `.gitattributes`.
 2. Configure the Stripe webhook before going live; it makes order creation independent of the customer's browser.
 3. Apply the recommended constraints in a dedicated migration, after checking existing production data for duplicate carts.
 4. Before deploying, the production server needs Python 3.12+, `pip install -r requirements.txt` and `python manage.py migrate` (migrations `0003`, `0004`).
