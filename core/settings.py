@@ -108,6 +108,15 @@ TEMPLATES = [
     },
 ]
 
+if DEBUG:
+    # Django caches templates even in DEBUG and only refreshes them under runserver's
+    # autoreloader; under gunicorn that would hide template edits until a restart.
+    TEMPLATES[0]['APP_DIRS'] = False
+    TEMPLATES[0]['OPTIONS']['loaders'] = [
+        'django.template.loaders.filesystem.Loader',
+        'django.template.loaders.app_directories.Loader',
+    ]
+
 WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {

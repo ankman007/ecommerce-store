@@ -1,101 +1,52 @@
 {% load static %}
-<footer class="bg-gray-800 text-white pt-6">
-  <div
-    class="text-white text-center py-3 px-6"
-    style="background-color: rgb(79, 70, 229)"
-  >
-    <span class="mr-4">Get connected with us on social networks:</span>
-    <span class="inline-flex space-x-4">
-      <a href="#" class="hover:text-gray-200"
-        ><i class="fab fa-facebook-f"></i
-      ></a>
-      <a href="#" class="hover:text-gray-200"><i class="fab fa-twitter"></i></a>
-      <a href="#" class="hover:text-gray-200"
-        ><i class="fab fa-instagram"></i
-      ></a>
-      <a href="#" class="hover:text-gray-200"
-        ><i class="fab fa-linkedin-in"></i
-      ></a>
-    </span>
-  </div>
-
-  <div class="container mx-auto px-4 py-6">
-    <div
-      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-gray-300"
-    >
-      <div>
-        <a class="flex items-center gap-2" href="/">
-          <img class="h-6" src="{% static 'images/logo.svg' %}" alt="Logo" />
-          <span class="text-lg font-bold">A One Albany Wholesale</span>
+<footer class="site-footer mt-auto">
+  <div class="container mx-auto px-4 py-8">
+    <div class="grid grid-cols-2 lg:grid-cols-12 gap-x-6 gap-y-8 text-sm">
+      <div class="col-span-2 lg:col-span-4">
+        <a class="flex items-center gap-2 mb-3 text-gray-900 no-underline" href="{% url 'home' %}">
+          <img class="h-5 brightness-0" src="{% static 'images/logo.svg' %}" alt="" />
+          <span class="font-semibold">A One Albany Wholesale</span>
         </a>
+        <p class="text-gray-500 leading-relaxed max-w-xs mb-0">
+          Quality products at wholesale prices, shipped from Albany, NY.
+        </p>
       </div>
 
-      <div>
-        <h6 class="uppercase font-semibold mb-2">Categories</h6>
-        <ul class="space-y-1">
-          {% for cat in footer_categories %}
-          <li>
-            <a href="{% url 'category' cat.slug %}" class="hover:underline">
-              {{ cat.name }}
-            </a>
-          </li>
-          {% empty %}
-          <li class="text-gray-400">Coming soon</li>
+      <div class="lg:col-span-3">
+        <h6 class="footer-heading">Shop</h6>
+        <ul class="footer-links">
+          <li><a href="{% url 'home' %}">All products</a></li>
+          {% for cat in footer_categories|slice:":3" %}
+          <li><a href="{% url 'category' cat.slug %}">{{ cat.name }}</a></li>
           {% endfor %}
         </ul>
       </div>
-      <!-- Useful Links -->
-      <div>
-        <h6 class="uppercase font-semibold mb-2">menu</h6>
-        <ul class="space-y-1">
-          <li><a href="/" class="hover:underline">Home</a></li>
-          <li>
-            <a href="{% url 'about' %}" class="hover:underline">About Us</a>
-          </li>
-          <li>
-            <a href="{% url 'contact' %}" class="hover:underline">Contact</a>
-          </li>
-          <li>
-            <a href="{% url 'privacy_policy' %}" class="hover:underline"
-              >Privacy Policy</a
-            >
-          </li>
+
+      <div class="lg:col-span-2">
+        <h6 class="footer-heading">Help</h6>
+        <ul class="footer-links">
+          <li><a href="{% url 'contact' %}">Contact us</a></li>
+          <li><a href="{% url 'about' %}">About us</a></li>
+          {% if user.is_authenticated %}<li><a href="{% url 'orders' %}">Your orders</a></li>{% endif %}
+          <li><a href="{% url 'privacy_policy' %}">Privacy policy</a></li>
         </ul>
       </div>
 
-      <!-- Contact -->
-      <div>
-        <h6 class="uppercase font-semibold mb-2">
-          <a
-            href="{% url 'contact' %}"
-            class="hover:underline uppercase font-semibold mb-2"
-            >Contact</a
-          >
-        </h6>
-        <ul class="space-y-1 text-sm">
-          <li class="flex items-start">
-            <i class="fas fa-home mr-2 mt-1"></i> 87 Central Avenue, Albany, NY
-            12206
-          </li>
-          <li class="flex items-start">
-            <i class="fas fa-envelope mr-2 mt-1"></i>
-            <a href="mailto:hadabinesh1@gmail.com" class="hover:underline"
-              >hadabinesh1@gmail.com</a
-            >
-          </li>
-          <li class="flex items-start">
-            <i class="fas fa-phone mr-2 mt-1"></i> 518-599-503 / 518-971-4066
-          </li>
-          <li class="flex items-start">
-            <i class="fas fa-user mr-2 mt-1"></i> Binesh Hada (941-312-3186)
-          </li>
+      <div class="col-span-2 lg:col-span-3">
+        <h6 class="footer-heading">Get in touch</h6>
+        <ul class="footer-links text-gray-500">
+          <li class="flex gap-2"><i class="bi bi-geo-alt mt-0.5"></i><span>87 Central Avenue, Albany, NY 12206</span></li>
+          <li class="flex gap-2"><i class="bi bi-envelope mt-0.5"></i><a href="mailto:hadabinesh1@gmail.com">hadabinesh1@gmail.com</a></li>
+          <li class="flex gap-2"><i class="bi bi-telephone mt-0.5"></i><span>518-599-503 &middot; 518-971-4066</span></li>
         </ul>
       </div>
     </div>
   </div>
 
-  <!-- Footer Bottom -->
-  <div class="bg-gray-900 text-center text-gray-400 text-sm py-2">
-    &copy; {{ year }} A One Albany Wholesale. All rights reserved.
+  <div class="border-t border-gray-200">
+    <div class="container mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
+      <span>&copy; {{ year }} A One Albany Wholesale. All rights reserved.</span>
+      <span class="flex items-center gap-1"><i class="bi bi-shield-lock"></i> Secure payments by Stripe</span>
+    </div>
   </div>
 </footer>
