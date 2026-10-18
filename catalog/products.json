@@ -1,0 +1,92 @@
+{
+  "products": [
+    {
+      "name": "CeraVe Moisturizing Cream (50 ml)",
+      "category": "Skincare",
+      "price": "9.99",
+      "stock": 40,
+      "image": "cerave-moisturizing-cream-50ml.jpg",
+      "description": "Rich, non-greasy daily moisturizer for dry to very dry skin, in a travel-friendly 50 ml (1.69 oz) tube.\n\nFormulated with three essential ceramides and hyaluronic acid to help restore the skin barrier and lock in moisture. Fragrance-free and suitable for face and body."
+    },
+    {
+      "name": "The Ordinary Glycolic Acid 7% Toning Solution",
+      "category": "Skincare",
+      "price": "13.50",
+      "stock": 30,
+      "image": "the-ordinary-glycolic-acid-7-toner.jpg",
+      "description": "Exfoliating toner with 7% glycolic acid that gently resurfaces skin for a brighter, more even, glowing complexion.\n\nUse once a day in the evening on clean, dry skin and avoid the eye area. Wear sunscreen during the day while using exfoliating acids."
+    },
+    {
+      "name": "Farmacy Green Clean Makeup Meltaway Cleansing Balm (200 ml)",
+      "category": "Skincare",
+      "price": "38.00",
+      "stock": 18,
+      "image": "farmacy-green-clean-cleansing-balm.jpg",
+      "description": "Large 200 ml (6.8 fl oz) jar of cleansing balm that melts into an oil on contact to dissolve makeup, sunscreen and the day's grime.\n\nMassage onto dry skin, add a little water to emulsify, then rinse. Leaves skin clean and soft without a tight feeling."
+    },
+    {
+      "name": "Rosadia Face Wash",
+      "category": "Skincare",
+      "price": "16.00",
+      "stock": 25,
+      "image": "rosadia-face-wash.jpg",
+      "description": "Gentle gel cleanser made with damask rose essential water, mandelic acid and evening primrose oil.\n\nThe pump bottle makes it easy to use morning and night; lather with warm water and rinse for fresh, balanced skin."
+    },
+    {
+      "name": "The Act Body Butter",
+      "category": "Bath & Body",
+      "price": "24.00",
+      "stock": 20,
+      "image": "the-act-body-butter.jpg",
+      "description": "Velvety-smooth body butter rich with shea butter, orange oil, grape seed oil and mango seed oil.\n\nSoftens rough skin, nourishes dry patches and gives all-day moisture with a delicate, sweet and juicy fragrance."
+    },
+    {
+      "name": "Dove Go Fresh Cucumber & Green Tea Shower Gel",
+      "category": "Bath & Body",
+      "price": "7.49",
+      "stock": 60,
+      "image": "dove-go-fresh-shower-gel.jpg",
+      "description": "Refreshing shower gel with a crisp cucumber and green tea scent and Dove's moisturising cream.\n\nLeaves skin softer and smoother after one shower."
+    },
+    {
+      "name": "NIVEA Body Milk Nourishing Lotion",
+      "category": "Bath & Body",
+      "price": "8.99",
+      "stock": 45,
+      "image": "nivea-body-milk-lotion.jpg",
+      "description": "5-in-1 complete care body lotion for dry to very dry skin, with deep moisture serum, almond oil and vitamin E.\n\nAbsorbs quickly and provides up to 48 hours of intense moisture."
+    },
+    {
+      "name": "Giorgio Armani Acqua di Giò Profondo",
+      "category": "Fragrance",
+      "price": "105.00",
+      "stock": 12,
+      "image": "armani-acqua-di-gio-profondo.jpg",
+      "description": "A deeper, more intense take on the classic Acqua di Giò: a fresh aquatic fragrance for men with aromatic, mineral notes.\n\nComes in the signature blue gradient bottle."
+    },
+    {
+      "name": "Ralph Lauren Polo Black",
+      "category": "Fragrance",
+      "price": "82.00",
+      "stock": 10,
+      "image": "ralph-lauren-polo-black.jpg",
+      "description": "Warm, modern woody fragrance for men in the signature dark Polo bottle.\n\nA confident evening scent that pairs fruity freshness with a smooth, woody base."
+    },
+    {
+      "name": "Dior Sauvage",
+      "category": "Fragrance",
+      "price": "115.00",
+      "stock": 8,
+      "image": "dior-sauvage.jpg",
+      "description": "Fresh and spicy fragrance for men with a strong, lasting trail.\n\nOne of Dior's best-known scents: bright citrus up front with a warm, ambery dry-down."
+    },
+    {
+      "name": "Denim Low-Top Sneakers",
+      "category": "Footwear",
+      "price": "120.00",
+      "stock": 6,
+      "image": "denim-low-top-sneakers.jpg",
+      "description": "Low-top sneakers in light-wash denim with darker denim overlays, tonal denim laces and a clean white cushioned sole.\n\nA casual everyday pair that goes with jeans and shorts alike."
+    }
+  ]
+}
