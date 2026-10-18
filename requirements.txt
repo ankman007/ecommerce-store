@@ -1,5 +1,5 @@
 Django==6.1.2
-django-allauth==65.19.7
+django-allauth==65.20.0
 django-cleanup==9.0.0
 django-htmx==1.29.0
 celery[redis]==5.6.3

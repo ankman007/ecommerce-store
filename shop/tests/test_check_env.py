@@ -10,6 +10,14 @@ STRIPE_SECRET = 'sk_' + 'live_51AbCdEfGhIjKlMnOpQrStUv'
 WEBHOOK_SECRET = 'whsec_AbCdEfGhIjKlMnOpQrStUvWxYz123456'
 DB_PASSWORD = 'Str0ng-Db-Passw0rd-123'
 EMAIL_PASSWORD = 'abcd efgh ijkl mnop'
+SMTP_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+
+def mailers(backend=SMTP_BACKEND, **options):
+    """A MAILERS setting like core/settings.py builds from the EMAIL_* env vars."""
+    base = {'host': 'smtp.gmail.com', 'port': 587, 'username': 'orders@shop.test', 'password': EMAIL_PASSWORD}
+    return {'default': {'BACKEND': backend, 'OPTIONS': {**base, **options} if backend == SMTP_BACKEND else {}}}
+
 
 PRODUCTION = dict(
     SECRET_KEY=GOOD_SECRET_KEY,
@@ -31,10 +39,8 @@ PRODUCTION = dict(
     STRIPE_PUBLIC_KEY='pk_live_51AbCdEfGhIjKlMnOpQrStUv',
     STRIPE_SECRET_KEY=STRIPE_SECRET,
     STRIPE_WEBHOOK_SECRET=WEBHOOK_SECRET,
-    EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend',
-    EMAIL_HOST='smtp.gmail.com',
-    EMAIL_HOST_USER='orders@shop.test',
-    EMAIL_HOST_PASSWORD=EMAIL_PASSWORD,
+    MAILERS=mailers(),
+    DEFAULT_FROM_EMAIL='orders@shop.test',
     RECIPIENT_EMAIL='owner@shop.test',
     SESSION_COOKIE_SECURE=True,
     CSRF_COOKIE_SECURE=True,
@@ -174,12 +180,12 @@ class CheckEnvTests(SimpleTestCase):
     def test_malformed_stripe_key_is_an_error(self):
         self.assert_fails_with('does not look like a publishable key')
 
-    @production(EMAIL_HOST_USER='', EMAIL_HOST_PASSWORD='replace-with-an-app-password')
+    @production(MAILERS=mailers(username='', password='replace-with-an-app-password'))
     def test_smtp_credentials_are_checked(self):
         output = self.assert_fails_with('EMAIL_HOST_USER is not set')
         self.assertIn('EMAIL_HOST_PASSWORD is a placeholder', output)
 
-    @production(EMAIL_BACKEND='django.core.mail.backends.console.EmailBackend', EMAIL_HOST_USER='')
+    @production(MAILERS=mailers('django.core.mail.backends.console.EmailBackend'))
     def test_console_email_backend_is_a_warning(self):
         ok, output, _ = self.run_check()
         self.assertTrue(ok, output)

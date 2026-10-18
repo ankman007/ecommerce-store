@@ -44,6 +44,15 @@ def _value(name):
     return value.strip() if isinstance(value, str) else value
 
 
+def _default_mailer():
+    """Backend path and options of MAILERS['default'] (Django 6.1 replaced the EMAIL_* settings)."""
+    mailer = (getattr(settings, 'MAILERS', None) or {}).get('default') or {}
+    options = {
+        key: value.strip() if isinstance(value, str) else value for key, value in (mailer.get('OPTIONS') or {}).items()
+    }
+    return (mailer.get('BACKEND') or '').strip(), options
+
+
 def _looks_like_placeholder(value):
     lowered = value.lower()
     return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
@@ -201,18 +210,18 @@ class Command(BaseCommand):
             self.error('STRIPE_WEBHOOK_SECRET is a placeholder or not a whsec_ signing secret.')
 
     def check_email(self):
-        backend = _value('EMAIL_BACKEND') or ''
+        backend, options = _default_mailer()
         if backend in NON_DELIVERING_EMAIL_BACKENDS:
             self.warn(f'EMAIL_BACKEND is the {backend.split(".")[-2]} backend; no email will be delivered.')
         elif backend == SMTP_BACKEND:
-            if not _value('EMAIL_HOST'):
+            if not options.get('host'):
                 self.error('EMAIL_HOST is not set.')
-            user = _value('EMAIL_HOST_USER') or ''
+            user = options.get('username') or ''
             if not user:
                 self.error('EMAIL_HOST_USER is not set.')
             elif _looks_like_placeholder(user):
                 self.error('EMAIL_HOST_USER is a placeholder.')
-            password = _value('EMAIL_HOST_PASSWORD') or ''
+            password = options.get('password') or ''
             if not password:
                 self.error('EMAIL_HOST_PASSWORD is not set.')
             elif _looks_like_placeholder(password):

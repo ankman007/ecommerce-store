@@ -3,7 +3,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 
-@override_settings(RECIPIENT_EMAIL='owner@example.com', EMAIL_HOST_USER='noreply@example.com')
+@override_settings(RECIPIENT_EMAIL='owner@example.com', DEFAULT_FROM_EMAIL='noreply@example.com')
 class ContactFormTests(TestCase):
     def test_get_renders_form(self):
         resp = self.client.get(reverse('contact'))

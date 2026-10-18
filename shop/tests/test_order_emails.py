@@ -16,7 +16,7 @@ from shop.views.payment import fulfill_checkout_session, refund_order
 from .test_checkout import FakeSession
 
 
-@override_settings(EMAIL_HOST_USER='orders@shop.test', SITE_URL='https://shop.test')
+@override_settings(DEFAULT_FROM_EMAIL='orders@shop.test', SITE_URL='https://shop.test')
 class OrderEmailTests(TestCase):
     def setUp(self):
         self.user = make_user('carol')
@@ -144,7 +144,7 @@ class OrderEmailTests(TestCase):
     def test_status_email_for_missing_order_is_noop(self):
         self.assertFalse(send_order_status_email(999999, 'shipped'))
 
-    @override_settings(SITE_URL=None, EMAIL_HOST_USER=None, DEFAULT_FROM_EMAIL='shop@fallback.test')
+    @override_settings(SITE_URL=None, DEFAULT_FROM_EMAIL='shop@fallback.test')
     def test_falls_back_to_sites_framework_and_default_from(self):
         Order.objects.filter(pk=self.order.pk).update(paid=True)
         send_order_confirmation(self.order.id)
