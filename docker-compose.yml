@@ -1,11 +1,15 @@
 services:
   web:
     build: .
+    # Local dev only: the bind-mounted project keeps host file ownership (Windows drvfs,
+    # or a host UID other than 1000 on Linux), so the image's non-root user can't write
+    # media/ uploads. Production (docker-compose.prod.yml) runs as the non-root `app` user.
+    user: root
     command: >
       sh -c "
         python manage.py migrate --noinput &&
         python core/create_admin.py &&
-        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3 --reload"
+        gunicorn core.wsgi:application --bind 0.0.0.0:8000 --workers 3 --reload --control-socket /tmp/gunicorn.ctl"
     ports:
       - "${WEB_PORT:-8085}:8000"
     volumes:
@@ -28,6 +32,10 @@ services:
 
   celery:
     build: .
+    # Local dev only: the bind-mounted project keeps host file ownership (Windows drvfs,
+    # or a host UID other than 1000 on Linux), so the image's non-root user can't write
+    # media/ uploads. Production (docker-compose.prod.yml) runs as the non-root `app` user.
+    user: root
     command: celery -A core worker --loglevel=info --pool=solo
     # Not a web server: skip the image's HTTP healthcheck
     healthcheck:

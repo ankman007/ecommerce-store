@@ -14,6 +14,10 @@ def _int(name, default):
 
 bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8000")
 
+# gunicorn 26 creates a control socket in the working directory by default; /app is
+# read-only for the non-root user, so keep it in /tmp.
+control_socket = os.getenv("GUNICORN_CONTROL_SOCKET", "/tmp/gunicorn.ctl")
+
 # WEB_CONCURRENCY is the conventional knob; default to 2 x CPUs + 1, capped so a big host
 # doesn't spawn dozens of workers that each hold a DB connection.
 workers = _int("WEB_CONCURRENCY", min(multiprocessing.cpu_count() * 2 + 1, 8))
