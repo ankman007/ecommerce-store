@@ -7,6 +7,7 @@
 # - No host ports: Dokploy's Traefik proxy owns 80/443. Attach a domain to the `nginx`
 #   service (container port 80) in the Domains tab; Traefik routes it over dokploy-network.
 # - Data lives in named volumes (Dokploy cleans bind-mounted paths on redeploy).
+# - web runs check_env + migrations before starting, so a failure shows in its logs.
 # See docs/DOKPLOY.md.
 
 x-logging: &logging
@@ -16,7 +17,7 @@ x-logging: &logging
     max-file: "5"
 
 x-app: &app
-  # Built once by the `migrate` service; the other app services reuse the same local image.
+  # Built once by the `web` service; the other app services reuse the same local image.
   # (Building it in every service makes parallel builds race to write the same tag.)
   image: ecommerce-store-app:dokploy
   pull_policy: never
@@ -28,36 +29,34 @@ x-app: &app
   logging: *logging
 
 services:
-  migrate:
+  web:
     <<: *app
     build:
       context: .
     pull_policy: build
-    # Validates settings (warnings don't block), applies migrations and creates the
-    # admin from ADMIN_* variables if they are set. Runs on every deploy; all steps are idempotent.
+    # Pre-start steps run here (not in a separate one-shot service) so that if one fails,
+    # the reason is in this container's logs, which Dokploy's Logs tab shows:
+    # check settings (warnings don't block) -> migrate -> create admin from ADMIN_* -> serve.
     command: >
-      sh -c "python manage.py check_env &&
-             python manage.py migrate --noinput &&
-             python core/create_admin.py"
-    restart: "no"
-    healthcheck:
-      disable: true
-    volumes:
-      - media:/app/media
-    depends_on:
-      db:
-        condition: service_healthy
-
-  web:
-    <<: *app
-    command: gunicorn --config deploy/gunicorn.conf.py core.wsgi:application
+      sh -c "echo '== Checking environment ==' && python manage.py check_env &&
+             echo '== Applying migrations ==' && python manage.py migrate --noinput &&
+             python core/create_admin.py &&
+             echo '== Starting web server ==' &&
+             exec gunicorn --config deploy/gunicorn.conf.py core.wsgi:application"
     volumes:
       - media:/app/media
     expose:
       - "8000"
+    healthcheck:
+      test: ["CMD", "python", "deploy/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # First start includes migrations
+      start_period: 120s
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -74,8 +73,8 @@ services:
       retries: 3
       start_period: 30s
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -89,8 +88,8 @@ services:
       retries: 3
       start_period: 20s
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
 

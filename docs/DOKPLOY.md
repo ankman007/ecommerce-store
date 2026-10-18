@@ -49,12 +49,20 @@ Whatever you choose, put the same host(s) in `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIG
 
 ## 5. Deploy
 
-Click **Deploy**. Dokploy builds the images and starts the stack. On every deploy the `migrate` service:
-1. runs `python manage.py check_env`: errors stop the deploy, warnings don't;
+Click **Deploy**. Dokploy builds the images and starts the stack. Each time it starts, the `web` container:
+1. runs `python manage.py check_env`: errors stop it, warnings don't;
 2. applies database migrations;
-3. creates the admin account from `ADMIN_*` if it doesn't exist.
+3. creates the admin account from `ADMIN_*` if it doesn't exist;
+4. starts the web server.
 
-`web`, `celery` and `celery-beat` start only after `migrate` succeeds. If the site doesn't come up, open the `migrate` service logs first.
+**If the deploy ends with `container ...-web-1 is unhealthy`:** open **Logs**, select the **web** container and look for lines starting with `ERROR` just after `== Checking environment ==` or `== Applying migrations ==`. Fix the value in **Environment** and deploy again.
+
+| Error in the web logs | Fix |
+|---|---|
+| `DEBUG is on` | `DEBUG=False` |
+| `ALLOWED_HOSTS only lists local hosts` | put your Dokploy domain host / server IP in `ALLOWED_HOSTS` |
+| `... is a placeholder` | replace that `replace-with-...` value with a real one |
+| `Access denied for user` (during migrations) | MySQL keeps the passwords from the **first** deploy in its volume: put the original `DB_PASSWORD`/`DB_ROOT_PASSWORD` back, or (only if no real data yet) delete the `mysql_data` volume and redeploy |
 
 ## 6. Load the product catalog (once)
 
