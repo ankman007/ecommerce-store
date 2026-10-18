@@ -143,8 +143,11 @@ class CheckEnvTests(SimpleTestCase):
         self.assert_fails_with('CELERY_BROKER_URL is not set')
 
     @production(STRIPE_WEBHOOK_SECRET='')
-    def test_missing_webhook_secret_is_an_error(self):
-        self.assert_fails_with('STRIPE_WEBHOOK_SECRET is not set')
+    def test_missing_webhook_secret_is_a_warning(self):
+        # Stripe requires HTTPS for webhooks; an HTTP-only first deploy must still start.
+        ok, output, _ = self.run_check()
+        self.assertTrue(ok, output)
+        self.assertIn('STRIPE_WEBHOOK_SECRET is not set', output)
 
     @production(STRIPE_WEBHOOK_SECRET='whsec_*************')
     def test_placeholder_webhook_secret_is_an_error(self):

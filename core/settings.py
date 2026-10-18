@@ -189,7 +189,8 @@ ACCOUNT_EMAIL_VERIFICATION = os.getenv('ACCOUNT_EMAIL_VERIFICATION', 'optional')
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_PREVENT_ENUMERATION = True
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = False
-ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
+# Scheme for links in account emails. Override with http while the site has no TLS (e.g. IP-only deploys).
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = os.getenv('ACCOUNT_DEFAULT_HTTP_PROTOCOL') or ('http' if DEBUG else 'https')
 
 
 # ---------------------------------------------------------------------------

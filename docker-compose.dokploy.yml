@@ -1,0 +1,146 @@
+# Production stack for Dokploy (Compose application, "Compose Path": ./docker-compose.dokploy.yml).
+#
+# Differences from docker-compose.prod.yml:
+# - Images are built from the repository by Dokploy (no registry needed).
+# - Environment comes from Dokploy's Environment tab, which Dokploy writes to `.env`
+#   next to this file.
+# - No host ports: Dokploy's Traefik proxy owns 80/443. Attach a domain to the `nginx`
+#   service (container port 80) in the Domains tab; Traefik routes it over dokploy-network.
+# - Data lives in named volumes (Dokploy cleans bind-mounted paths on redeploy).
+# See docs/DOKPLOY.md.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app: &app
+  build:
+    context: .
+  image: ecommerce-store-app:dokploy
+  env_file:
+    - .env
+  environment:
+    DJANGO_SETTINGS_MODULE: core.settings
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  migrate:
+    <<: *app
+    # Validates settings (warnings don't block), applies migrations and creates the
+    # admin from ADMIN_* variables if they are set. Runs on every deploy; all steps are idempotent.
+    command: >
+      sh -c "python manage.py check_env &&
+             python manage.py migrate --noinput &&
+             python core/create_admin.py"
+    restart: "no"
+    healthcheck:
+      disable: true
+    volumes:
+      - media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    command: gunicorn --config deploy/gunicorn.conf.py core.wsgi:application
+    volumes:
+      - media:/app/media
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  celery:
+    <<: *app
+    command: celery -A core worker --concurrency=${CELERY_CONCURRENCY:-2}
+    volumes:
+      - media:/app/media
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A core inspect ping --destination celery@$$HOSTNAME --timeout 10 > /dev/null"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    <<: *app
+    command: celery -A core beat --schedule /tmp/celerybeat-schedule
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, redis; redis.Redis.from_url(os.environ['CELERY_BROKER_URL']).ping()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  nginx:
+    build:
+      context: deploy/nginx
+    image: ecommerce-store-nginx:dokploy
+    volumes:
+      - media:/srv/media:ro
+    restart: unless-stopped
+    logging: *logging
+    networks:
+      - default
+      - dokploy-network
+    depends_on:
+      web:
+        condition: service_healthy
+
+  redis:
+    image: redis:8-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:?set DB_NAME in the Environment tab}
+      MYSQL_USER: ${DB_USER:?set DB_USER in the Environment tab}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in the Environment tab}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in the Environment tab}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+networks:
+  dokploy-network:
+    external: true
+
+volumes:
+  mysql_data:
+  redis_data:
+  media:

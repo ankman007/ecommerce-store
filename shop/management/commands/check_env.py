@@ -203,7 +203,12 @@ class Command(BaseCommand):
                 self.warn('Stripe keys are test-mode keys; no real payments will be taken.')
 
         if not webhook_secret:
-            self.error('STRIPE_WEBHOOK_SECRET is not set; paid orders would never be confirmed.')
+            # Stripe only delivers webhooks to HTTPS URLs, so a site without TLS yet can't have one.
+            # Orders are still confirmed by the success page and the reconciliation job (every 15 min).
+            self.warn(
+                'STRIPE_WEBHOOK_SECRET is not set: orders are only confirmed when the customer returns to the '
+                'success page or by the 15-minute reconciliation job. Register a webhook once the site has HTTPS.'
+            )
         elif (
             not webhook_secret.startswith('whsec_') or '*' in webhook_secret or _looks_like_placeholder(webhook_secret)
         ):
