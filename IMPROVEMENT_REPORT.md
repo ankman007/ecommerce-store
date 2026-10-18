@@ -1,6 +1,6 @@
 # Improvement Report
 
-Audit and hardening pass over the Django eCommerce store, done by five parallel agents (backend, performance, testing, security, business logic) followed by an integration review. Nothing has been committed yet.
+Audit and hardening pass over the Django eCommerce store, done by five parallel agents (backend, performance, testing, security, business logic) followed by an integration review, then extended through Phases 0–2, 4 and 5 of the roadmap. Phase 3 (Nepal payment gateways) was dropped: the store sells in the US. See `FINAL_IMPLEMENTATION_REPORT.md` for the latest round.
 
 ## Summary
 
@@ -10,8 +10,11 @@ Audit and hardening pass over the Django eCommerce store, done by five parallel 
 | Performance | Home page 44 → 3 queries, search 41 → 3, category/product 12 → 4 |
 | Security | Production hardening in settings, fail-fast secret key, form validation, Flower bound to localhost |
 | Storefront UX | Reworked catalog, product, cart, order pages; footer categories fixed site-wide |
-| Tests | 0 → **130 tests, all passing** |
-| Lint | `ruff` (pyflakes + syntax) clean apart from one pre-existing star import |
+| Store features (Phase 4) | Shipping address step, order emails, shipping workflow in admin, pagination/sort/filters, SEO, sitemap |
+| Deployment (Phase 2) | Non-root image, production Compose with nginx, `check_env`, manual approved deploy workflow |
+| Code health (Phase 5) | CKEditor removed, `MAILERS` email config, unified logging, Celery settings bug fixed |
+| Tests | 0 → **287 tests, all passing**, 99% coverage (excluding migrations and tests) |
+| Lint / CI | ruff lint + format enforced in CI and pre-commit |
 
 ## Changes by area
 
@@ -151,9 +154,10 @@ All are optional and have safe defaults; see `.env.example`.
 | Low | `Payment` model is unused (payment intents are now stored on `Order`) | Remove it |
 | Low | Refunds don't restore stock | Restock automatically for refunds of orders that were not oversold, if the business wants that |
 | Low | The verification-email link sends on GET; profile settings read `emailaddress_set.first` instead of the primary address | Switch to POST; use the primary address |
-| Low | Star import in `users/urls.py` | Use explicit imports |
-| Low | Django 6.1 deprecates the `EMAIL_*` settings | Migrate to `MAILERS` before Django 7 |
-| Info | Stripe isn't available to merchants in Nepal | Add Khalti/eSewa behind the same "verify on the server, then fulfil" flow |
+| ~~Low~~ | ~~Star import in `users/urls.py`~~ | Resolved: explicit imports |
+| ~~Low~~ | ~~Django 6.1 deprecates the `EMAIL_*` settings~~ | Resolved: email configured through `MAILERS` |
+| Info | Nepal payment gateways (Khalti/eSewa) | Not needed: US store, Stripe only |
+| Medium | The local dev image hasn't been rebuilt since the non-root Dockerfile and CKEditor removal (Docker Desktop build error) | Restart Docker Desktop, then `docker compose up -d --build` |
 
 ## Recommendations
 1. ~~Commit this work and add a GitHub Actions job that runs the test suite on every push.~~ Done: `.github/workflows/ci.yml` (lint + tests), pre-commit hooks and `.gitattributes`.

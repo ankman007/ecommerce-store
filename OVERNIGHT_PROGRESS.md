@@ -34,19 +34,27 @@ Model/migration/checkout work is serialised to avoid conflicting migrations.
 | Item | Status |
 |---|---|
 | Stage A baseline | done |
-| A3 Phase 4 store functionality | **merged** (d09a524): 194 tests OK, lint OK, no missing migrations; migration 0006 applied to local MySQL (7 orders, 19 products intact); smoke test of 10 pages OK |
-| A1 Docker & deploy | running (worktree) |
-| A4a Code health | running (worktree) |
-| A2 Nepal payments (Phase 3) | running (worktree from d09a524) |
-| A4b CKEditor removal | running (worktree from d09a524), owns shop migration 0007 |
-| Stage 3 (A5 QA) | waiting for all merges |
+| A3 Phase 4 store functionality | merged (d09a524) |
+| A1 Docker & deploy | merged (07fb74e) |
+| A4b CKEditor removal | merged (2edbb1e) |
+| A4a Code health | merged with integration fixes (ea1dedd) |
+| A2 Nepal payments (Phase 3) | **dropped by the owner** (US store); unfinished branch discarded |
+| Dev stack rebuild | skipped by the owner (Docker Desktop build error) |
+| A5 QA review | not run (owner ended the run) |
+| Final validation | 287 tests OK, 99% coverage, lint clean, no missing migrations, compose files valid, no secrets tracked |
+
+**Run finished.** See `FINAL_IMPLEMENTATION_REPORT.md`.
 
 ## Integration log
 
 1. `da97866` chore: progress log, ignore `.claude/` worktrees and coverage files
 2. `d09a524` merge Phase 4 (branch commit 647af84): `/checkout/` address step, order address snapshot, confirmation/shipped/refunded emails (once-only via `confirmation_sent_at`), admin "Mark as shipped" + tracking number, pagination/sort/price/in-stock filters, image attrs, SEO blocks, sitemap.xml, robots.txt. Migration `0006_order_shipping_fulfilment_product_created`.
 
-## Follow-ups for the coordinator
+3. `07fb74e` merge Phase 2 (resolved `.gitignore` conflict)
+4. `2edbb1e` merge CKEditor removal (migration `0007`, applied locally)
+5. `ea1dedd` merge code health (resolved settings/requirements conflicts; MAILERS fixes in check_env, order emails and tests; added `SITE_URL`)
+
+## Follow-ups for the coordinator (all done)
 
 - Add `SITE_URL` setting (email links) after A4a's settings refactor merges; document in .env.example.
 - Nginx (A1) must pass `/robots.txt` and `/sitemap.xml` to Django.
