@@ -16,9 +16,10 @@ x-logging: &logging
     max-file: "5"
 
 x-app: &app
-  build:
-    context: .
+  # Built once by the `migrate` service; the other app services reuse the same local image.
+  # (Building it in every service makes parallel builds race to write the same tag.)
   image: ecommerce-store-app:dokploy
+  pull_policy: never
   env_file:
     - .env
   environment:
@@ -29,6 +30,9 @@ x-app: &app
 services:
   migrate:
     <<: *app
+    build:
+      context: .
+    pull_policy: build
     # Validates settings (warnings don't block), applies migrations and creates the
     # admin from ADMIN_* variables if they are set. Runs on every deploy; all steps are idempotent.
     command: >
