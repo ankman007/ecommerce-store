@@ -1,0 +1,24 @@
+# Cloudflare Tunnel connector for a Dokploy server whose ports 80/443 can't be reached
+# from the internet (firewall or NAT). cloudflared makes an OUTBOUND connection to
+# Cloudflare, and Cloudflare sends visitors' requests back through it, so no port needs
+# to be opened. Deploy it as its own Dokploy Compose service (Compose Path:
+# ./deploy/cloudflared/docker-compose.yml) with TUNNEL_TOKEN in its Environment tab.
+#
+# In the Cloudflare tunnel, point each public hostname at Dokploy's Traefik
+# (http://dokploy-traefik:80); Traefik then routes every domain to the right app.
+# One tunnel serves all apps on this server. See docs/DOKPLOY.md, section 10.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.3
+    command: tunnel --no-autoupdate run
+    environment:
+      # cloudflared reads the token from this variable, which keeps it off the command line.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in the Environment tab}
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true

@@ -106,3 +106,30 @@ Example: `ecommerce-store.ankit-poudel.com.np`, managed in Cloudflare.
 If the browser shows **Cloudflare error 526** right after adding the domain, Let's Encrypt hasn't issued the certificate yet: set the DNS record to **DNS only** (grey cloud), wait a couple of minutes, then switch it back to **Proxied**.
 
 HTTPS flows Cloudflare → Traefik → nginx → Django; nginx forwards Traefik's `X-Forwarded-Proto: https`, which Django trusts (`SECURE_PROXY_SSL_HEADER`), so secure cookies and CSRF checks work.
+
+## 10. Cloudflare error 522: the server can't be reached from the internet
+
+**522** means Cloudflare could not even open a connection to the server. The app's nginx logs show no incoming requests at all. Confirm from any computer outside the server's network:
+
+```bash
+curl -v --max-time 10 http://<server-ip>
+```
+
+If it times out, ports 80/443 are blocked by a firewall, or the server sits behind a router (NAT) that doesn't forward them. No app setting can fix that. There are two options, and both need the server/network owner's agreement:
+
+### Option A: open the ports
+Ask the network owner to allow (or port-forward) **TCP 80 and 443** from the public IP to the Dokploy server. Everything in section 9 then works unchanged.
+
+### Option B: Cloudflare Tunnel (no open ports needed)
+`cloudflared` runs as a container, makes an outbound connection to Cloudflare, and Cloudflare sends visitors through it. One tunnel serves every app on the server.
+
+1. **Cloudflare → Zero Trust → Networks → Tunnels → Create a tunnel** → *Cloudflared* → name it. On the install screen, copy the **token** (the long string after `--token`).
+2. **Dokploy:** create a new **Compose** service from this repository with Compose Path `./deploy/cloudflared/docker-compose.yml`. In its Environment tab add `TUNNEL_TOKEN=<token>`, then deploy. The tunnel should turn **Healthy** in Cloudflare.
+3. **Cloudflare DNS:** delete the existing `A` records for the subdomains you'll route through the tunnel (e.g. `ecommerce-store`). The tunnel creates its own records, and they conflict with existing ones of the same name.
+4. **Tunnel → Public Hostname → Add**, for each app:
+   - Subdomain `ecommerce-store`, domain `ankit-poudel.com.np`
+   - Service type **HTTP**, URL **`dokploy-traefik:80`**
+5. **Dokploy → each app's Domains:** keep the same host, but set **HTTPS off** and **Certificate None**. Cloudflare handles HTTPS at its edge and the tunnel delivers plain HTTP to Traefik; with HTTPS on, Traefik would redirect in a loop.
+6. Keep the app's environment set for HTTPS (`https://` in `CSRF_TRUSTED_ORIGINS` and `SITE_URL`, no "no TLS" overrides). Visitors still use `https://`.
+
+If the tunnel is Healthy but the site gives **502**, Traefik isn't reachable under that name: check the Traefik container's name and network in Dokploy and use those in step 4.
