@@ -62,7 +62,7 @@ Click **Deploy**. Dokploy builds the images and starts the stack. Each time it s
 | `DEBUG is on` | `DEBUG=False` |
 | `ALLOWED_HOSTS only lists local hosts` | put your Dokploy domain host / server IP in `ALLOWED_HOSTS` |
 | `... is a placeholder` | replace that `replace-with-...` value with a real one |
-| `Access denied for user` (during migrations) | MySQL keeps the passwords from the **first** deploy in its volume: put the original `DB_PASSWORD`/`DB_ROOT_PASSWORD` back, or (only if no real data yet) delete the `mysql_data` volume and redeploy |
+| `Access denied for user` (during migrations; Celery logs show it too) | MySQL created its users with the passwords from the **first** deploy and ignores later changes. **No real data yet:** add `DB_VOLUME_VERSION=3` (one higher than before; the default is 2) and redeploy, which starts a fresh database with the current passwords. **Real data:** put the original passwords back, or change the user's password inside MySQL (db container terminal: `mysql -uroot -p'<root password>' -e "ALTER USER 'ecommerce'@'%' IDENTIFIED BY '<new>';"`) |
 
 ## 6. Load the product catalog (once)
 
@@ -86,6 +86,23 @@ Then sign in at `/admin/` with the `ADMIN_*` credentials.
 
 MySQL data, uploaded media and Redis live in named volumes (`mysql_data`, `media`, `redis_data`). Redeploys keep them. Set up **Volume Backups** in Dokploy for `mysql_data` and `media`.
 
-## 9. Moving to a real domain later
+## 9. Moving to a real domain (Cloudflare)
 
-Point the domain's DNS A record at the server, add it in **Domains** with HTTPS + Let's Encrypt, update `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` and `SITE_URL`, remove the four "no TLS" overrides, register the Stripe webhook, and redeploy.
+Example: `ecommerce-store.ankit-poudel.com.np`, managed in Cloudflare.
+
+1. **Cloudflare → DNS:** an `A` record `ecommerce-store` → server IP, **Proxied** (orange cloud).
+2. **Cloudflare → SSL/TLS → Overview:** **Full (strict)**.
+3. **Dokploy → Domains:** add Host `ecommerce-store.ankit-poudel.com.np`, service **`nginx`**, container port **`80`** (not 8000: nginx also serves product images), HTTPS **on**, certificate **Let's Encrypt**. Delete the old traefik.me/sslip.io domain.
+4. **Environment:**
+   ```env
+   ALLOWED_HOSTS=ecommerce-store.ankit-poudel.com.np
+   CSRF_TRUSTED_ORIGINS=https://ecommerce-store.ankit-poudel.com.np
+   SITE_URL=https://ecommerce-store.ankit-poudel.com.np
+   ```
+   and **delete** these four lines so the secure defaults apply: `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`, `ACCOUNT_DEFAULT_HTTP_PROTOCOL`.
+5. **Deploy.**
+6. **Stripe webhook** (now possible, because the site has HTTPS): Stripe Dashboard → Developers → Webhooks → add `https://ecommerce-store.ankit-poudel.com.np/stripe/webhook/` with the four events in section 7. Copy its signing secret into `STRIPE_WEBHOOK_SECRET` and deploy again.
+
+If the browser shows **Cloudflare error 526** right after adding the domain, Let's Encrypt hasn't issued the certificate yet: set the DNS record to **DNS only** (grey cloud), wait a couple of minutes, then switch it back to **Proxied**.
+
+HTTPS flows Cloudflare → Traefik → nginx → Django; nginx forwards Traefik's `X-Forwarded-Proto: https`, which Django trusts (`SECURE_PROXY_SSL_HEADER`), so secure cookies and CSRF checks work.

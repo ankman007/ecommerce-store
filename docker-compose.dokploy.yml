@@ -145,5 +145,12 @@ networks:
 
 volumes:
   mysql_data:
+    # MySQL creates its users only when this volume is first initialised, from the
+    # DB_PASSWORD / DB_ROOT_PASSWORD set at that moment; changing them later in the
+    # Environment tab does NOT change the database ("Access denied" errors).
+    # Bumping DB_VOLUME_VERSION starts on a NEW, EMPTY database created with the current
+    # passwords. The old volume is kept, not deleted, but the store stops using its data,
+    # so never bump it on a store with real orders: change the password in MySQL instead.
+    name: ${COMPOSE_PROJECT_NAME}_mysql_${DB_VOLUME_VERSION:-2}
   redis_data:
   media:
