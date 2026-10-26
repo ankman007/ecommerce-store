@@ -87,13 +87,9 @@ All logs go to the console (`docker compose logs`). Set `LOG_LEVEL` (default `IN
 
 ## Production deployment
 
-Production runs `docker-compose.prod.yml`: gunicorn behind nginx (which also serves uploaded media), a Celery worker and beat, MySQL and Redis, from images that the manual **Deploy** workflow (`.github/workflows/deploy.yml`) tests, builds and pushes to GHCR, then deploys over SSH after approval on the `production` environment. Configuration lives in `.env.prod` (template: `.env.prod.example`) and is validated by `python manage.py check_env` before every migration.
+Production runs on [Dokploy](https://dokploy.com) from `docker-compose.dokploy.yml`: gunicorn behind nginx (which also serves uploaded media), a Celery worker and beat, MySQL and Redis. Configuration comes from Dokploy's Environment tab (template: `.env.dokploy.example`) and is validated by `python manage.py check_env` every time the web container starts.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for server setup, TLS, the Stripe webhook, backups and rollback.
-
-### Dokploy
-
-To deploy on [Dokploy](https://dokploy.com) (works with just a server IP, no domain needed), use `docker-compose.dokploy.yml` with the environment template `.env.dokploy.example`. Step-by-step guide: [docs/DOKPLOY.md](docs/DOKPLOY.md).
+Step-by-step guide (domains, HTTPS with Cloudflare, Stripe webhook, troubleshooting): [docs/DOKPLOY.md](docs/DOKPLOY.md).
 
 ### Product catalog
 

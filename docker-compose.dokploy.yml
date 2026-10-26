@@ -1,6 +1,6 @@
 # Production stack for Dokploy (Compose application, "Compose Path": ./docker-compose.dokploy.yml).
 #
-# Differences from docker-compose.prod.yml:
+# How it works:
 # - Images are built from the repository by Dokploy (no registry needed).
 # - Environment comes from Dokploy's Environment tab, which Dokploy writes to `.env`
 #   next to this file.

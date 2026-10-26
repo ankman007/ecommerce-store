@@ -1,6 +1,6 @@
 """Gunicorn settings for production (``gunicorn --config deploy/gunicorn.conf.py core.wsgi:application``).
 
-Every value can be tuned with an environment variable in .env.prod without rebuilding the image.
+Every value can be tuned with an environment variable (Dokploy Environment tab) without rebuilding the image.
 """
 
 import multiprocessing

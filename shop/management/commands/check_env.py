@@ -1,6 +1,6 @@
 """Check that the production configuration is complete and safe.
 
-Run before migrating on every deploy (the ``migrate`` service in docker-compose.prod.yml does).
+Runs before migrating every time the web container starts (see docker-compose.dokploy.yml).
 Problems are printed by setting name only; secret values are never echoed.
 Exits non-zero when there is any error (or any warning with --fail-on-warning).
 """
@@ -8,7 +8,7 @@ Exits non-zero when there is any error (or any warning with --fail-on-warning).
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-# Values copied from .env.example / .env.prod.example or used for local builds and tests.
+# Values copied from .env.example / .env.dokploy.example or used for local builds and tests.
 PLACEHOLDER_SECRET_KEYS = {
     'your-django-secret-key',
     'replace-with-a-long-random-secret',
